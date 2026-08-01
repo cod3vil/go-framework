@@ -25,6 +25,8 @@ type AppConfig struct {
 	Name string `mapstructure:"name"`
 	// Mode 运行模式: debug / release / test，对应 gin 的模式。
 	Mode string `mapstructure:"mode"`
+	// CaptchaEnabled 登录是否启用图形验证码。
+	CaptchaEnabled bool `mapstructure:"captcha_enabled"`
 }
 
 // ServerConfig HTTP 服务配置。
@@ -119,6 +121,7 @@ func Load(path string) (*Config, error) {
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.name", "go-framework")
 	v.SetDefault("app.mode", "debug")
+	v.SetDefault("app.captcha_enabled", true)
 
 	v.SetDefault("server.host", "0.0.0.0")
 	v.SetDefault("server.port", 8080)

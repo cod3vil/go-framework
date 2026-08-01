@@ -21,12 +21,24 @@ make dev
 make build && ./bin/server
 ```
 
-验证：
+初始化与验证：
 
 ```bash
+# 建表 + 种子数据（默认管理员 admin/admin123、默认角色/菜单/部门）
+go run ./cmd/server migrate
+
+# 修改管理员密码
+go run ./cmd/server create-admin --password '新密码'
+
 curl http://127.0.0.1:8080/api/v1/health
 # {"code":0,"msg":"ok","data":{"database":"up","status":"up",...}}
+
+# 端到端冒烟测试（需本机 Redis，用于读取验证码答案）
+bash scripts/smoke-test.sh
 ```
+
+已内置接口：登录（验证码/失败锁定/登录日志）、登出与令牌刷新（黑名单/轮换）、
+用户/角色/菜单/部门管理、角色绑定菜单与 API 权限（Casbin 实时生效）。
 
 配置文件位于 `configs/config.yaml`，所有配置可用环境变量覆盖（前缀 `APP`，层级用下划线，如 `APP_SERVER_PORT=9000`）。
 
@@ -46,7 +58,7 @@ web/               管理后台前端（P4）
 ## 路线图
 
 - [x] P1 框架骨架：核心库、App 容器、中间件、健康检查
-- [ ] P2 认证授权：JWT 双令牌、Casbin RBAC、用户/角色/菜单/部门
+- [x] P2 认证授权：JWT 双令牌、Casbin RBAC、用户/角色/菜单/部门
 - [ ] P3 系统管理：字典、参数、审计日志、定时任务、文件上传、监控、Swagger
 - [ ] P4 管理后台前端：React + Ant Design，embed 单二进制
 - [ ] P5 示例模块与文档：v0.1.0

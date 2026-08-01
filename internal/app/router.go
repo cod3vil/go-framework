@@ -1,17 +1,19 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/cod3vil/go-framework/internal/middleware"
+	"github.com/cod3vil/go-framework/internal/system"
 	"github.com/cod3vil/go-framework/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 // setupRouter 注册全局中间件与各模块路由。
 // 新增业务模块时在 registerModules 中挂载一行即可。
-func (a *App) setupRouter() {
+func (a *App) setupRouter() error {
 	e := a.Engine
 
 	e.Use(
@@ -28,7 +30,7 @@ func (a *App) setupRouter() {
 
 	api := e.Group("/api/v1")
 	a.registerHealth(api)
-	a.registerModules(api)
+	return a.registerModules(api)
 }
 
 var startTime = time.Now()
@@ -52,10 +54,18 @@ func (a *App) registerHealth(api *gin.RouterGroup) {
 	})
 }
 
-// registerModules 挂载系统模块与业务模块。
-// P2 起在此注册 system 模块；业务模块同样在此挂载：
-//
-//	article.Register(a.toolkit(), api)
-func (a *App) registerModules(api *gin.RouterGroup) {
-	_ = api
+// registerModules 挂载系统模块与业务模块，新模块在此追加注册。
+func (a *App) registerModules(api *gin.RouterGroup) error {
+	sysModule, err := system.Register(api, system.Options{
+		DB:     a.DB,
+		Cache:  a.Cache,
+		Logger: a.Logger,
+		Config: a.Config,
+		Engine: a.Engine,
+	})
+	if err != nil {
+		return fmt.Errorf("注册 system 模块失败: %w", err)
+	}
+	a.System = sysModule
+	return nil
 }

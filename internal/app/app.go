@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cod3vil/go-framework/internal/system"
 	"github.com/cod3vil/go-framework/pkg/cache"
 	"github.com/cod3vil/go-framework/pkg/config"
 	"github.com/cod3vil/go-framework/pkg/database"
@@ -27,6 +28,8 @@ type App struct {
 	DB     *gorm.DB
 	Cache  cache.Cache
 	Engine *gin.Engine
+	// System 系统管理模块，暴露 Enforcer/Service 供业务模块复用。
+	System *system.Module
 }
 
 // New 按序初始化各组件：配置 → 日志 → 数据库 → 缓存 → HTTP 引擎与路由。
@@ -67,7 +70,9 @@ func New(configPath string) (*App, error) {
 		Cache:  c,
 		Engine: gin.New(),
 	}
-	app.setupRouter()
+	if err := app.setupRouter(); err != nil {
+		return nil, err
+	}
 	return app, nil
 }
 

@@ -5,6 +5,7 @@
 app:
   name: go-framework
   mode: debug # debug / release / test
+  captcha_enabled: true # 登录图形验证码开关
 
 server:
   host: 0.0.0.0

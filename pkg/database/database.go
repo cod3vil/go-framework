@@ -26,6 +26,9 @@ func New(cfg config.DatabaseConfig) (*gorm.DB, error) {
 
 	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger: gormlogger.Default.LogMode(parseLogLevel(cfg.LogLevel)),
+		// 关联完整性由应用层保证，不生成数据库外键，
+		// 避免 0 值关联与删除顺序问题，也便于分库分表演进。
+		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("连接数据库失败: %w", err)
