@@ -1,0 +1,49 @@
+# go-framework
+
+架构简单但功能强大的企业级 Go 开发框架，内置后端 API 框架与后台 Web 管理系统。
+
+设计文档见 [docs/DESIGN.md](docs/DESIGN.md)。
+
+## 技术栈
+
+Gin · GORM · Casbin · Viper · Zap · JWT · React 18 + Ant Design 5（管理后台，embed 单二进制部署）
+
+## 快速开始
+
+```bash
+# 开发模式启动（默认 sqlite + 内存缓存，零外部依赖）
+make dev
+
+# 编译单二进制
+make build && ./bin/server
+```
+
+验证：
+
+```bash
+curl http://127.0.0.1:8080/api/v1/health
+# {"code":0,"msg":"ok","data":{"database":"up","status":"up",...}}
+```
+
+配置文件位于 `configs/config.yaml`，所有配置可用环境变量覆盖（前缀 `APP`，层级用下划线，如 `APP_SERVER_PORT=9000`）。
+
+## 目录结构
+
+```
+cmd/server/        CLI 入口（serve / version）
+configs/           配置文件
+internal/app/      应用容器、路由总入口、优雅启停
+internal/middleware/ 框架中间件（recovery/requestid/访问日志/cors/限流）
+internal/system/   内置系统管理模块（P2+）
+internal/modules/  业务模块目录
+pkg/               可复用核心库（config/logger/database/cache/response/errs）
+web/               管理后台前端（P4）
+```
+
+## 路线图
+
+- [x] P1 框架骨架：核心库、App 容器、中间件、健康检查
+- [ ] P2 认证授权：JWT 双令牌、Casbin RBAC、用户/角色/菜单/部门
+- [ ] P3 系统管理：字典、参数、审计日志、定时任务、文件上传、监控、Swagger
+- [ ] P4 管理后台前端：React + Ant Design，embed 单二进制
+- [ ] P5 示例模块与文档：v0.1.0
