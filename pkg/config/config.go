@@ -87,8 +87,8 @@ type RedisConfig struct {
 type JWTConfig struct {
 	Secret string `mapstructure:"secret"`
 	// AccessExpire / RefreshExpire 单位分钟。
-	AccessExpire  int `mapstructure:"access_expire"`
-	RefreshExpire int `mapstructure:"refresh_expire"`
+	AccessExpire  int    `mapstructure:"access_expire"`
+	RefreshExpire int    `mapstructure:"refresh_expire"`
 	Issuer        string `mapstructure:"issuer"`
 }
 
