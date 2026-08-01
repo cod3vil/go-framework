@@ -134,8 +134,8 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("log.max_backups", 10)
 	v.SetDefault("log.max_age_days", 30)
 
-	v.SetDefault("database.driver", "sqlite")
-	v.SetDefault("database.dsn", "data/app.db")
+	v.SetDefault("database.driver", "postgres")
+	v.SetDefault("database.dsn", "host=127.0.0.1 user=postgres password=postgres dbname=app port=5432 sslmode=disable")
 	v.SetDefault("database.max_open_conns", 100)
 	v.SetDefault("database.max_idle_conns", 10)
 	v.SetDefault("database.conn_max_lifetime", 3600)

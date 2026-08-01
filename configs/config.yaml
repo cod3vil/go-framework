@@ -25,17 +25,17 @@ log:
   compress: true
 
 database:
-  driver: sqlite # sqlite / mysql / postgres
-  dsn: data/app.db
+  driver: postgres # postgres / mysql / sqlite
+  dsn: host=127.0.0.1 user=postgres password=postgres dbname=app port=5432 sslmode=disable TimeZone=Asia/Shanghai
   # mysql 示例: user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-  # postgres 示例: host=127.0.0.1 user=postgres password=pass dbname=app port=5432 sslmode=disable
+  # sqlite 示例(本地快速体验): driver: sqlite, dsn: data/app.db
   max_open_conns: 100
   max_idle_conns: 10
   conn_max_lifetime: 3600
   log_level: info # silent / error / warn / info
 
 redis:
-  addr: "" # 为空使用内存缓存；如 127.0.0.1:6379
+  addr: 127.0.0.1:6379 # 为空时降级为内存缓存
   password: ""
   db: 0
 

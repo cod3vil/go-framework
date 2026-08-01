@@ -11,8 +11,11 @@ Gin · GORM · Casbin · Viper · Zap · JWT · React 18 + Ant Design 5（管理
 ## 快速开始
 
 ```bash
-# 开发模式启动（默认 sqlite + 内存缓存，零外部依赖）
+# 开发模式启动（默认 PostgreSQL + Redis，见 configs/config.yaml）
 make dev
+
+# 无 PG/Redis 的本地快速体验：改 database.driver 为 sqlite、redis.addr 留空即可
+# （sqlite 用纯 Go 驱动，Redis 缺省时自动降级为内存缓存）
 
 # 编译单二进制
 make build && ./bin/server

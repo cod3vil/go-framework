@@ -19,12 +19,12 @@
 | 领域 | 选型 | 说明 |
 |------|------|------|
 | HTTP 框架 | [Gin](https://github.com/gin-gonic/gin) | 生态成熟、中间件丰富 |
-| ORM | [GORM](https://gorm.io) | 支持 MySQL / PostgreSQL / SQLite，自动迁移 |
+| ORM | [GORM](https://gorm.io) | 默认 PostgreSQL，兼容 MySQL / SQLite，自动迁移 |
 | 配置 | [Viper](https://github.com/spf13/viper) | YAML 配置 + 环境变量覆盖 |
 | 日志 | [Zap](https://github.com/uber-go/zap) + lumberjack | 结构化日志、按大小滚动切割 |
 | 认证 | JWT（golang-jwt/jwt/v5） | Access Token + Refresh Token 双令牌 |
 | 权限 | [Casbin](https://casbin.org) | RBAC 模型，策略存 DB，动态变更 |
-| 缓存 | go-redis v9（可选降级为内存缓存） | 统一 Cache 接口，无 Redis 也能跑 |
+| 缓存 | go-redis v9，默认启用 Redis | 统一 Cache 接口，未配置 Redis 时降级为内存缓存 |
 | 定时任务 | robfig/cron/v3 | 后台可查看/启停任务 |
 | 参数校验 | validator/v10（Gin 内置） | 统一翻译为中文错误信息 |
 | API 文档 | swaggo/swag | 注释生成 Swagger UI |
