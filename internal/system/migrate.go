@@ -47,6 +47,9 @@ func seed(db *gorm.DB) error {
 	if err := seedMenus(db); err != nil {
 		return err
 	}
+	if err := seedArticleMenu(db); err != nil {
+		return err
+	}
 	if err := seedConfigs(db); err != nil {
 		return err
 	}
@@ -198,6 +201,36 @@ func seedMenus(db *gorm.DB) error {
 			if err := db.Create(&btn).Error; err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+// seedArticleMenu 为示例业务模块 article 注入顶级菜单与按钮权限，
+// 演示业务模块如何登记菜单（与系统菜单同构）。
+func seedArticleMenu(db *gorm.DB) error {
+	var count int64
+	db.Model(&model.SysMenu{}).Where("name = ?", "Article").Count(&count)
+	if count > 0 {
+		return nil
+	}
+	menu := model.SysMenu{
+		ParentID: 0, Title: "内容管理", Name: "Article", Type: model.MenuTypeMenu,
+		Path: "/article", Component: "article/index", Perm: "article:list",
+		Icon: "file", Sort: 2, Visible: 1, Status: model.StatusEnabled,
+	}
+	if err := db.Create(&menu).Error; err != nil {
+		return err
+	}
+	buttons := map[string]string{"query": "查询", "add": "新增", "edit": "修改", "del": "删除"}
+	order := []string{"query", "add", "edit", "del"}
+	for i, b := range order {
+		btn := model.SysMenu{
+			ParentID: menu.ID, Title: buttons[b], Type: model.MenuTypeButton,
+			Perm: "article:" + b, Sort: i + 1, Visible: 1, Status: model.StatusEnabled,
+		}
+		if err := db.Create(&btn).Error; err != nil {
+			return err
 		}
 	}
 	return nil

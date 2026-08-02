@@ -2,7 +2,7 @@
 
 架构简单但功能强大的企业级 Go 开发框架，内置后端 API 框架与后台 Web 管理系统。
 
-设计文档见 [docs/DESIGN.md](docs/DESIGN.md)。
+设计文档见 [docs/DESIGN.md](docs/DESIGN.md)，业务模块开发见 [docs/MODULE_GUIDE.md](docs/MODULE_GUIDE.md)。
 
 ## 技术栈
 
@@ -80,10 +80,19 @@ pkg/               可复用核心库（config/logger/database/cache/response/er
 web/               管理后台前端（P4）
 ```
 
+## 业务模块开发
+
+在 `internal/modules/<模块名>/` 下按 model/service/handler/router 四文件组织，
+用 `kit.Secured(path)` 注册受保护路由（自动获得认证 + RBAC + 审计），再到
+`internal/app/router.go` 的 `registerModules` 挂载一行即可。内置示例模块 `article`
+（后端 `internal/modules/article/`，前端 `web/src/pages/article/ArticlePage.tsx`，
+冒烟测试 `scripts/smoke-test-article.sh`）演示了完整前后端流程。详见
+[docs/MODULE_GUIDE.md](docs/MODULE_GUIDE.md)。
+
 ## 路线图
 
 - [x] P1 框架骨架：核心库、App 容器、中间件、健康检查
 - [x] P2 认证授权：JWT 双令牌、Casbin RBAC、用户/角色/菜单/部门
 - [x] P3 系统管理：字典、参数、审计日志、定时任务、文件上传、监控、Swagger
 - [x] P4 管理后台前端：React + Ant Design，embed 单二进制
-- [ ] P5 示例模块与文档：v0.1.0
+- [x] P5 示例模块与文档：article 示例模块 + 模块开发指南，v0.1.0

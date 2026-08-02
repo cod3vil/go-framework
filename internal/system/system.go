@@ -37,6 +37,10 @@ type Module struct {
 	Service  *service.Service
 	Enforcer *casbin.Enforcer
 	Cron     *cronx.Manager
+	// 共享中间件，供业务模块经 modkit 复用（认证/RBAC/写操作审计）。
+	AuthMW    gin.HandlerFunc
+	RBACMW    gin.HandlerFunc
+	OperLogMW gin.HandlerFunc
 }
 
 // Register 装配系统模块并注册路由到 api 分组（通常为 /api/v1）。
@@ -185,7 +189,14 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		sys.GET("/apis", listAPIs(opt.Engine))
 	}
 
-	return &Module{Service: svc, Enforcer: enforcer, Cron: cronManager}, nil
+	return &Module{
+		Service:   svc,
+		Enforcer:  enforcer,
+		Cron:      cronManager,
+		AuthMW:    authMW,
+		RBACMW:    rbacMW,
+		OperLogMW: operLogMW,
+	}, nil
 }
 
 // Init 在服务启动后调用：加载并启动定时任务调度。

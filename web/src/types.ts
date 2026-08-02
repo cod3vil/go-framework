@@ -165,6 +165,18 @@ export interface FileItem {
   createdAt: string
 }
 
+export interface Article {
+  id: number
+  title: string
+  author: string
+  content: string
+  status: number
+  views: number
+  createdBy: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ServerStat {
   host: { hostname: string; os: string; platform: string; arch: string; bootTime: string }
   cpu: { cores: number; usedPercent: number }

@@ -1,7 +1,7 @@
 // 各业务模块的 API 封装，按后端路由一一对应。
 import { request } from './request'
 import type {
-  Config, Dept, Dict, DictItem, FileItem, Job, JobLog, LoginLog, Menu,
+  Article, Config, Dept, Dict, DictItem, FileItem, Job, JobLog, LoginLog, Menu,
   OperLog, PageResult, Role, ServerStat, TokenPair, User, UserInfo,
 } from '@/types'
 
@@ -105,4 +105,13 @@ export const fileApi = {
 // ---- 监控 ----
 export const monitorApi = {
   server: () => request<ServerStat>({ url: '/system/monitor/server' }),
+}
+
+// ---- 示例业务模块：文章 ----
+export const articleApi = {
+  list: (params: Query) => request<PageResult<Article>>({ url: '/articles', params }),
+  get: (id: number) => request<Article>({ url: `/articles/${id}` }),
+  create: (data: Query) => request({ url: '/articles', method: 'post', data }),
+  update: (id: number, data: Query) => request({ url: `/articles/${id}`, method: 'put', data }),
+  remove: (id: number) => request({ url: `/articles/${id}`, method: 'delete' }),
 }

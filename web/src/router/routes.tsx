@@ -13,6 +13,7 @@ import OperLogPage from '@/pages/system/OperLogPage'
 import LoginLogPage from '@/pages/system/LoginLogPage'
 import FilePage from '@/pages/system/FilePage'
 import MonitorPage from '@/pages/system/MonitorPage'
+import ArticlePage from '@/pages/article/ArticlePage'
 
 export interface RouteEntry {
   path: string
@@ -32,4 +33,6 @@ export const routeComponents: RouteEntry[] = [
   { path: 'system/login-log', element: <LoginLogPage /> },
   { path: 'system/file', element: <FilePage /> },
   { path: 'system/monitor', element: <MonitorPage /> },
+  // 示例业务模块
+  { path: 'article', element: <ArticlePage /> },
 ]

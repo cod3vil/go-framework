@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/cod3vil/go-framework/internal/middleware"
+	"github.com/cod3vil/go-framework/internal/modkit"
+	"github.com/cod3vil/go-framework/internal/modules/article"
 	"github.com/cod3vil/go-framework/internal/system"
 	"github.com/cod3vil/go-framework/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -72,5 +74,21 @@ func (a *App) registerModules(api *gin.RouterGroup) error {
 		return fmt.Errorf("注册 system 模块失败: %w", err)
 	}
 	a.System = sysModule
+
+	// 业务模块工具箱：复用系统模块构建的认证/RBAC/审计中间件。
+	kit := &modkit.Kit{
+		DB:      a.DB,
+		Cache:   a.Cache,
+		Logger:  a.Logger,
+		Config:  a.Config,
+		API:     api,
+		Auth:    sysModule.AuthMW,
+		RBAC:    sysModule.RBACMW,
+		OperLog: sysModule.OperLogMW,
+	}
+
+	// —— 在此注册业务模块（每个模块一行）——
+	article.Register(kit)
+
 	return nil
 }
