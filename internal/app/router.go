@@ -30,7 +30,11 @@ func (a *App) setupRouter() error {
 
 	api := e.Group("/api/v1")
 	a.registerHealth(api)
-	return a.registerModules(api)
+	if err := a.registerModules(api); err != nil {
+		return err
+	}
+	a.registerOpenAPI()
+	return nil
 }
 
 var startTime = time.Now()

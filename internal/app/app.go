@@ -97,6 +97,13 @@ func (a *App) Run() error {
 		WriteTimeout: time.Duration(a.Config.Server.WriteTimeout) * time.Second,
 	}
 
+	// 启动定时任务调度（加载已启用任务）。
+	if a.System != nil {
+		if err := a.System.Init(context.Background()); err != nil {
+			a.Logger.Warn("初始化定时任务失败", zap.Error(err))
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -129,6 +136,9 @@ func (a *App) Run() error {
 
 // close 释放数据库、缓存等资源。
 func (a *App) close() {
+	if a.System != nil {
+		a.System.Stop() // 停止 cron 调度，等待执行中的任务完成
+	}
 	if a.Cache != nil {
 		if err := a.Cache.Close(); err != nil {
 			a.Logger.Warn("关闭缓存失败", zap.Error(err))

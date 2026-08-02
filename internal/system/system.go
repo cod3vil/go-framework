@@ -2,6 +2,7 @@
 package system
 
 import (
+	"context"
 	"strings"
 
 	"github.com/casbin/casbin/v3"
@@ -13,8 +14,10 @@ import (
 	"github.com/cod3vil/go-framework/pkg/cache"
 	"github.com/cod3vil/go-framework/pkg/captcha"
 	"github.com/cod3vil/go-framework/pkg/config"
+	"github.com/cod3vil/go-framework/pkg/cronx"
 	"github.com/cod3vil/go-framework/pkg/jwtx"
 	"github.com/cod3vil/go-framework/pkg/response"
+	"github.com/cod3vil/go-framework/pkg/upload"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -29,10 +32,11 @@ type Options struct {
 	Engine *gin.Engine
 }
 
-// Module 已装配的系统模块，暴露 Enforcer 等供其他模块复用。
+// Module 已装配的系统模块，暴露 Service/Enforcer/Cron 供其他模块复用与生命周期管理。
 type Module struct {
 	Service  *service.Service
 	Enforcer *casbin.Enforcer
+	Cron     *cronx.Manager
 }
 
 // Register 装配系统模块并注册路由到 api 分组（通常为 /api/v1）。
@@ -42,6 +46,14 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		return nil, err
 	}
 
+	uploader, err := upload.New(opt.Config.Upload)
+	if err != nil {
+		return nil, err
+	}
+
+	cronManager := cronx.New()
+	registerBuiltinTasks(cronManager, opt.Logger)
+
 	svc := &service.Service{
 		DB:       opt.DB,
 		Cache:    opt.Cache,
@@ -50,11 +62,19 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		JWT:      jwtx.NewManager(opt.Config.JWT),
 		Enforcer: enforcer,
 		Captcha:  captcha.New(opt.Cache),
+		Cron:     cronManager,
+		Uploader: uploader,
 	}
 	h := handler.New(svc)
 
+	// 上传文件静态访问：/uploads/** 映射到本地存储目录。
+	if opt.Config.Upload.Driver == "local" || opt.Config.Upload.Driver == "" {
+		opt.Engine.Static(opt.Config.Upload.URLPrefix, opt.Config.Upload.Dir)
+	}
+
 	authMW := middleware.Auth(svc.JWT, opt.Cache)
 	rbacMW := middleware.Casbin(enforcer, model.AdminRoleKey, opt.Logger)
+	operLogMW := middleware.OperLog(svc.RecordOperLog)
 
 	// 认证接口：无需登录。
 	auth := api.Group("/auth")
@@ -70,8 +90,8 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		authed.GET("/userinfo", h.UserInfo)
 	}
 
-	// 系统管理接口：登录 + RBAC。
-	sys := api.Group("/system", authMW, rbacMW)
+	// 系统管理接口：登录 + RBAC + 写操作审计。
+	sys := api.Group("/system", authMW, rbacMW, operLogMW)
 	{
 		users := sys.Group("/users")
 		{
@@ -109,11 +129,75 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 			depts.PUT("/:id", h.UpdateDept)
 			depts.DELETE("/:id", h.DeleteDept)
 		}
+		dicts := sys.Group("/dicts")
+		{
+			dicts.GET("", h.ListDicts)
+			dicts.POST("", h.CreateDict)
+			dicts.PUT("/:id", h.UpdateDict)
+			dicts.DELETE("/:id", h.DeleteDict)
+			dicts.GET("/:type/items", h.ListDictItems)
+		}
+		dictItems := sys.Group("/dict-items")
+		{
+			dictItems.POST("", h.CreateDictItem)
+			dictItems.PUT("/:id", h.UpdateDictItem)
+			dictItems.DELETE("/:id", h.DeleteDictItem)
+		}
+		configs := sys.Group("/configs")
+		{
+			configs.GET("", h.ListConfigs)
+			configs.POST("", h.CreateConfig)
+			configs.GET("/key/:key", h.GetConfigByKey)
+			configs.PUT("/:id", h.UpdateConfig)
+			configs.DELETE("/:id", h.DeleteConfig)
+		}
+		operLogs := sys.Group("/oper-logs")
+		{
+			operLogs.GET("", h.ListOperLogs)
+			operLogs.DELETE("", h.ClearOperLogs)
+		}
+		loginLogs := sys.Group("/login-logs")
+		{
+			loginLogs.GET("", h.ListLoginLogs)
+			loginLogs.DELETE("", h.ClearLoginLogs)
+		}
+		jobs := sys.Group("/jobs")
+		{
+			jobs.GET("", h.ListJobs)
+			jobs.GET("/tasks", h.ListJobTasks)
+			jobs.POST("", h.CreateJob)
+			jobs.PUT("/:id", h.UpdateJob)
+			jobs.PUT("/:id/status", h.SetJobStatus)
+			jobs.POST("/:id/run", h.RunJob)
+			jobs.DELETE("/:id", h.DeleteJob)
+		}
+		sys.GET("/job-logs", h.ListJobLogs)
+		files := sys.Group("/files")
+		{
+			files.GET("", h.ListFiles)
+			files.POST("", h.UploadFile)
+			files.GET("/:id/download", h.DownloadFile)
+			files.DELETE("/:id", h.DeleteFile)
+		}
+		sys.GET("/monitor/server", h.ServerMonitor)
+
 		// 已注册 API 清单，供角色管理页勾选 API 权限。
 		sys.GET("/apis", listAPIs(opt.Engine))
 	}
 
-	return &Module{Service: svc, Enforcer: enforcer}, nil
+	return &Module{Service: svc, Enforcer: enforcer, Cron: cronManager}, nil
+}
+
+// Init 在服务启动后调用：加载并启动定时任务调度。
+func (m *Module) Init(ctx context.Context) error {
+	return m.Service.InitJobs(ctx)
+}
+
+// Stop 在服务关闭时调用：停止定时任务调度，等待执行中的任务完成。
+func (m *Module) Stop() {
+	if m.Cron != nil {
+		m.Cron.Stop()
+	}
 }
 
 // apiInfo 一条已注册的 API 路由。

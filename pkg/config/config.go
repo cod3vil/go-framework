@@ -18,6 +18,21 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
+	Upload   UploadConfig   `mapstructure:"upload"`
+}
+
+// UploadConfig 文件上传配置。
+type UploadConfig struct {
+	// Driver 存储驱动，当前支持 local（预留 oss/s3）。
+	Driver string `mapstructure:"driver"`
+	// Dir 本地存储根目录。
+	Dir string `mapstructure:"dir"`
+	// URLPrefix 对外访问前缀，如 /uploads。
+	URLPrefix string `mapstructure:"url_prefix"`
+	// MaxSizeMB 单文件大小上限（MB）。
+	MaxSizeMB int `mapstructure:"max_size_mb"`
+	// AllowedExts 允许的扩展名（小写、含点），为空表示不限制。
+	AllowedExts []string `mapstructure:"allowed_exts"`
 }
 
 // AppConfig 应用基本信息。
@@ -147,4 +162,14 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("jwt.access_expire", 120)
 	v.SetDefault("jwt.refresh_expire", 10080)
 	v.SetDefault("jwt.issuer", "go-framework")
+
+	v.SetDefault("upload.driver", "local")
+	v.SetDefault("upload.dir", "data/uploads")
+	v.SetDefault("upload.url_prefix", "/uploads")
+	v.SetDefault("upload.max_size_mb", 20)
+	v.SetDefault("upload.allowed_exts", []string{
+		".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp",
+		".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+		".txt", ".csv", ".zip", ".rar", ".mp4", ".mp3",
+	})
 }

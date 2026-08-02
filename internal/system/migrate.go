@@ -17,6 +17,13 @@ func Migrate(db *gorm.DB) error {
 		&model.SysRole{},
 		&model.SysMenu{},
 		&model.SysLoginLog{},
+		&model.SysDict{},
+		&model.SysDictItem{},
+		&model.SysConfig{},
+		&model.SysOperLog{},
+		&model.SysJob{},
+		&model.SysJobLog{},
+		&model.SysFile{},
 	); err != nil {
 		return fmt.Errorf("自动迁移失败: %w", err)
 	}
@@ -37,7 +44,44 @@ func seed(db *gorm.DB) error {
 	if err := seedAdmin(db); err != nil {
 		return err
 	}
-	return seedMenus(db)
+	if err := seedMenus(db); err != nil {
+		return err
+	}
+	if err := seedConfigs(db); err != nil {
+		return err
+	}
+	return seedDicts(db)
+}
+
+func seedConfigs(db *gorm.DB) error {
+	var count int64
+	db.Model(&model.SysConfig{}).Count(&count)
+	if count > 0 {
+		return nil
+	}
+	configs := []model.SysConfig{
+		{Name: "系统名称", Key: "sys.name", Value: "go-framework 管理后台", Builtin: true, Remark: "后台标题"},
+		{Name: "初始密码", Key: "sys.user.initPassword", Value: "123456", Builtin: true, Remark: "用户重置后的默认密码"},
+	}
+	return db.Create(&configs).Error
+}
+
+func seedDicts(db *gorm.DB) error {
+	var count int64
+	db.Model(&model.SysDict{}).Count(&count)
+	if count > 0 {
+		return nil
+	}
+	// 通用状态字典，供各管理页启用/停用下拉使用。
+	dict := model.SysDict{Name: "通用状态", Type: "sys_common_status", Status: model.StatusEnabled, Remark: "启用/停用"}
+	if err := db.Create(&dict).Error; err != nil {
+		return err
+	}
+	items := []model.SysDictItem{
+		{DictType: "sys_common_status", Label: "启用", Value: "1", Sort: 1, ListClass: "success", Status: model.StatusEnabled},
+		{DictType: "sys_common_status", Label: "停用", Value: "2", Sort: 2, ListClass: "danger", Status: model.StatusEnabled},
+	}
+	return db.Create(&items).Error
 }
 
 func seedDept(db *gorm.DB) error {
@@ -116,10 +160,25 @@ func seedMenus(db *gorm.DB) error {
 			[]string{"query", "add", "edit", "del"}},
 		{"部门管理", "SystemDept", "dept", "system/dept/index", "system:dept",
 			[]string{"query", "add", "edit", "del"}},
+		{"字典管理", "SystemDict", "dict", "system/dict/index", "system:dict",
+			[]string{"query", "add", "edit", "del"}},
+		{"参数配置", "SystemConfig", "config", "system/config/index", "system:config",
+			[]string{"query", "add", "edit", "del"}},
+		{"定时任务", "SystemJob", "job", "system/job/index", "system:job",
+			[]string{"query", "add", "edit", "del", "status", "run"}},
+		{"操作日志", "SystemOperLog", "oper-log", "system/log/oper", "system:operlog",
+			[]string{"query", "del"}},
+		{"登录日志", "SystemLoginLog", "login-log", "system/log/login", "system:loginlog",
+			[]string{"query", "del"}},
+		{"文件管理", "SystemFile", "file", "system/file/index", "system:file",
+			[]string{"query", "upload", "del"}},
+		{"服务监控", "SystemMonitor", "monitor", "system/monitor/index", "system:monitor",
+			[]string{"query"}},
 	}
 	buttonTitles := map[string]string{
 		"query": "查询", "add": "新增", "edit": "修改", "del": "删除",
 		"resetPwd": "重置密码", "status": "启用停用", "perm": "分配权限",
+		"run": "执行", "upload": "上传",
 	}
 
 	for i, p := range pages {

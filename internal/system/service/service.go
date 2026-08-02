@@ -6,7 +6,9 @@ import (
 	"github.com/cod3vil/go-framework/pkg/cache"
 	"github.com/cod3vil/go-framework/pkg/captcha"
 	"github.com/cod3vil/go-framework/pkg/config"
+	"github.com/cod3vil/go-framework/pkg/cronx"
 	"github.com/cod3vil/go-framework/pkg/jwtx"
+	"github.com/cod3vil/go-framework/pkg/upload"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -20,4 +22,6 @@ type Service struct {
 	JWT      *jwtx.Manager
 	Enforcer *casbin.Enforcer
 	Captcha  *captcha.Captcha
+	Cron     *cronx.Manager
+	Uploader *upload.Uploader
 }

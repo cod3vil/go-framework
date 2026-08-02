@@ -45,3 +45,23 @@ jwt:
   access_expire: 120 # 分钟
   refresh_expire: 10080 # 分钟（7 天）
   issuer: go-framework
+
+upload:
+  driver: local # 当前支持 local（预留 oss/s3）
+  dir: data/uploads # 本地存储根目录
+  url_prefix: /uploads # 对外访问前缀
+  max_size_mb: 20 # 单文件大小上限
+  allowed_exts: # 允许的扩展名（小写含点），留空表示不限制
+    - .jpg
+    - .jpeg
+    - .png
+    - .gif
+    - .webp
+    - .pdf
+    - .doc
+    - .docx
+    - .xls
+    - .xlsx
+    - .zip
+    - .txt
+    - .csv
