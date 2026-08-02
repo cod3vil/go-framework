@@ -10,7 +10,7 @@ import "github.com/cod3vil/go-framework/internal/modkit"
 //	article.Register(kit)
 func Register(kit *modkit.Kit) {
 	svc := NewService(kit.DB)
-	h := NewHandler(svc)
+	h := NewHandler(svc, kit)
 
 	// 建表：业务模块自行迁移自己的表。
 	if err := kit.DB.AutoMigrate(&Article{}); err != nil {

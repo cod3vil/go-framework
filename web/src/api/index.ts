@@ -34,6 +34,7 @@ export const roleApi = {
   remove: (id: number) => request({ url: `/system/roles/${id}`, method: 'delete' }),
   menuIds: (id: number) => request<number[]>({ url: `/system/roles/${id}/menus` }),
   setMenus: (id: number, menuIds: number[]) => request({ url: `/system/roles/${id}/menus`, method: 'put', data: { menuIds } }),
+  deptIds: (id: number) => request<number[]>({ url: `/system/roles/${id}/depts` }),
   apis: (id: number) => request<{ path: string; method: string }[]>({ url: `/system/roles/${id}/apis` }),
   setApis: (id: number, apis: { path: string; method: string }[]) => request({ url: `/system/roles/${id}/apis`, method: 'put', data: { apis } }),
 }

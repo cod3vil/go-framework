@@ -22,6 +22,7 @@ func (h *Handler) ListUsers(c *gin.Context) {
 		Nickname: c.Query("nickname"),
 		Status:   int8(status),
 		DeptID:   uint(deptID),
+		Operator: middleware.UserID(c),
 	})
 	if err != nil {
 		response.Error(c, err)

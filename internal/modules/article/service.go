@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cod3vil/go-framework/pkg/datascope"
 	"github.com/cod3vil/go-framework/pkg/errs"
 	"gorm.io/gorm"
 )
@@ -29,9 +30,9 @@ type Query struct {
 	Status   int8
 }
 
-// List 分页查询文章。
-func (s *Service) List(ctx context.Context, q Query) ([]Article, int64, error) {
-	db := s.db.WithContext(ctx).Model(&Article{})
+// List 分页查询文章，按传入的数据范围过滤（部门维度 dept_id，本人维度 created_by）。
+func (s *Service) List(ctx context.Context, q Query, scope datascope.Scope) ([]Article, int64, error) {
+	db := s.db.WithContext(ctx).Model(&Article{}).Scopes(scope.GormScope("dept_id", "created_by"))
 	if q.Title != "" {
 		db = db.Where("title LIKE ?", "%"+q.Title+"%")
 	}
@@ -74,11 +75,11 @@ type Input struct {
 	Status  int8
 }
 
-// Create 新建文章。
-func (s *Service) Create(ctx context.Context, in Input, operator uint) (*Article, error) {
+// Create 新建文章，记录创建人与其部门，供数据权限过滤。
+func (s *Service) Create(ctx context.Context, in Input, operator, deptID uint) (*Article, error) {
 	a := Article{
 		Title: in.Title, Author: in.Author, Content: in.Content,
-		Status: in.Status, CreatedBy: operator,
+		Status: in.Status, CreatedBy: operator, DeptID: deptID,
 	}
 	if err := s.db.WithContext(ctx).Create(&a).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)

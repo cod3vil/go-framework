@@ -26,6 +26,7 @@ export interface Role {
   sort: number
   status: number
   remark: string
+  dataScope: number // 1 全部 2 自定义 3 本部门 4 本部门及以下 5 仅本人
 }
 
 export interface Dept {

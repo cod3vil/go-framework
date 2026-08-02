@@ -52,7 +52,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*jwtx.Pair, error) 
 		return nil, errs.New(errs.CodeForbidden, "账号已停用，请联系管理员")
 	}
 
-	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.RoleKeys())
+	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, user.RoleKeys())
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
@@ -85,7 +85,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*jwtx.Pair,
 	}
 
 	s.blacklistClaims(ctx, claims)
-	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.RoleKeys())
+	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, user.RoleKeys())
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}

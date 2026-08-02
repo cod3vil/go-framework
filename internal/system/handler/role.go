@@ -26,11 +26,13 @@ func (h *Handler) ListRoles(c *gin.Context) {
 }
 
 type roleReq struct {
-	Name   string `json:"name" binding:"required,max=64"`
-	Key    string `json:"key" binding:"required,max=64"`
-	Sort   int    `json:"sort"`
-	Status int8   `json:"status" binding:"omitempty,oneof=1 2"`
-	Remark string `json:"remark" binding:"max=255"`
+	Name      string `json:"name" binding:"required,max=64"`
+	Key       string `json:"key" binding:"required,max=64"`
+	Sort      int    `json:"sort"`
+	Status    int8   `json:"status" binding:"omitempty,oneof=1 2"`
+	Remark    string `json:"remark" binding:"max=255"`
+	DataScope int8   `json:"dataScope" binding:"omitempty,oneof=1 2 3 4 5"`
+	DeptIDs   []uint `json:"deptIds"`
 }
 
 func (r roleReq) toInput() service.RoleInput {
@@ -38,7 +40,10 @@ func (r roleReq) toInput() service.RoleInput {
 	if status == 0 {
 		status = 1
 	}
-	return service.RoleInput{Name: r.Name, Key: r.Key, Sort: r.Sort, Status: status, Remark: r.Remark}
+	return service.RoleInput{
+		Name: r.Name, Key: r.Key, Sort: r.Sort, Status: status, Remark: r.Remark,
+		DataScope: r.DataScope, DeptIDs: r.DeptIDs,
+	}
 }
 
 // CreateRole 创建角色。
@@ -101,6 +106,21 @@ func (h *Handler) DeleteRole(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// GetRoleDepts 查询角色自定义数据权限的部门 ID。
+// GET /api/v1/system/roles/:id/depts
+func (h *Handler) GetRoleDepts(c *gin.Context) {
+	id, ok := paramID(c)
+	if !ok {
+		return
+	}
+	ids, err := h.svc.GetRoleDeptIDs(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.OK(c, ids)
 }
 
 // GetRoleMenus 查询角色绑定的菜单 ID。

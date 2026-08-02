@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/cod3vil/go-framework/internal/middleware"
+	"github.com/cod3vil/go-framework/internal/modkit"
 	"github.com/cod3vil/go-framework/pkg/response"
 	"github.com/gin-gonic/gin"
 )
@@ -11,10 +12,11 @@ import (
 // Handler 文章 HTTP 处理层。
 type Handler struct {
 	svc *Service
+	kit *modkit.Kit
 }
 
-// NewHandler 创建处理器。
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler 创建处理器。kit 用于解析当前用户的数据范围。
+func NewHandler(svc *Service, kit *modkit.Kit) *Handler { return &Handler{svc: svc, kit: kit} }
 
 // List 分页查询文章。
 // GET /api/v1/articles
@@ -28,9 +30,14 @@ func (h *Handler) List(c *gin.Context) {
 		pageSize = 10
 	}
 	status, _ := strconv.Atoi(c.Query("status"))
+	scope, err := h.kit.ScopeOf(c)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
 	list, total, err := h.svc.List(c.Request.Context(), Query{
 		Page: page, PageSize: pageSize, Title: c.Query("title"), Status: int8(status),
-	})
+	}, scope)
 	if err != nil {
 		response.Error(c, err)
 		return
@@ -77,7 +84,7 @@ func (h *Handler) Create(c *gin.Context) {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
 	}
-	a, err := h.svc.Create(c.Request.Context(), req.toInput(), middleware.UserID(c))
+	a, err := h.svc.Create(c.Request.Context(), req.toInput(), middleware.UserID(c), middleware.DeptID(c))
 	if err != nil {
 		response.Error(c, err)
 		return

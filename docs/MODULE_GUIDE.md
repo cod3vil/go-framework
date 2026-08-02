@@ -80,6 +80,26 @@ func Register(kit *modkit.Kit) {
 | `kit.DB` / `kit.Cache` / `kit.Logger` / `kit.Config` | 核心资源 |
 | `kit.Secured(path)` | 返回挂载了 **认证 + RBAC 鉴权 + 写操作审计** 的路由分组 |
 | `kit.Public(path)` | 返回 `/api/v1` 下不鉴权的分组（如对外只读接口） |
+| `kit.ScopeOf(c)` | 解析当前用户的**行级数据范围**（数据权限），见下 |
+
+### 数据权限（行级数据范围）
+
+RBAC 控制“能不能访问接口”，数据权限控制“能看到哪些行”。角色可配置 5 种数据范围
+（全部 / 自定义部门 / 本部门 / 本部门及以下 / 仅本人），由后台「角色管理」设置。
+
+业务模块只需两步即可支持：
+
+1. 表中带上归属列 `created_by`（本人维度）与 `dept_id`（部门维度），创建时写入
+   `middleware.UserID(c)` 与 `middleware.DeptID(c)`；
+2. 查询时取当前用户的数据范围并作为 GORM Scopes 应用：
+
+```go
+scope, _ := kit.ScopeOf(c)
+db.Scopes(scope.GormScope("dept_id", "created_by")).Find(&rows)
+```
+
+多角色时取并集（越宽越优先）；超级管理员恒为“全部”。示例见 `internal/modules/article`
+的 `List`/`Create`，验证见 `scripts/smoke-test-datascope.sh`。
 
 ## 2. 挂载模块（一行）
 

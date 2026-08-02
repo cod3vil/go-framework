@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tree, App as AntdApp,
+  Button, Card, Form, Input, Modal, Popconfirm, Select, Space, Table, Tag, Tree, TreeSelect, App as AntdApp,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { menuApi, roleApi } from '@/api'
+import { deptApi, menuApi, roleApi } from '@/api'
 import { usePagedList } from '@/hooks/usePagedList'
 import { Auth } from '@/components/Auth'
 import StatusTag from '@/components/StatusTag'
-import type { Menu, Role } from '@/types'
+import type { Dept, Menu, Role } from '@/types'
 
 interface TreeNode {
   key: number
@@ -24,6 +24,29 @@ function toTreeData(menus: Menu[]): TreeNode[] {
   }))
 }
 
+interface DeptSelectNode {
+  value: number
+  title: string
+  children?: DeptSelectNode[]
+}
+function toDeptSelect(depts: Dept[]): DeptSelectNode[] {
+  return depts.map((d) => ({
+    value: d.id,
+    title: d.name,
+    children: d.children?.length ? toDeptSelect(d.children) : undefined,
+  }))
+}
+
+// 数据范围选项。
+const dataScopeOptions = [
+  { value: 1, label: '全部数据' },
+  { value: 2, label: '自定义部门' },
+  { value: 3, label: '本部门数据' },
+  { value: 4, label: '本部门及以下' },
+  { value: 5, label: '仅本人数据' },
+]
+const dataScopeLabel = (v: number) => dataScopeOptions.find((o) => o.value === v)?.label || '-'
+
 export default function RolePage() {
   const { message } = AntdApp.useApp()
   const list = usePagedList<Role>(roleApi.list)
@@ -38,15 +61,28 @@ export default function RolePage() {
   const [menuTree, setMenuTree] = useState<Menu[]>([])
   const [checkedKeys, setCheckedKeys] = useState<number[]>([])
 
+  // 数据权限：部门树，用于“自定义部门”范围。
+  const [deptTree, setDeptTree] = useState<Dept[]>([])
+  const dataScope = Form.useWatch('dataScope', form)
+
+  useEffect(() => {
+    deptApi.tree().then(setDeptTree).catch(() => {})
+  }, [])
+
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
-    form.setFieldsValue({ status: 1, sort: 0 })
+    form.setFieldsValue({ status: 1, sort: 0, dataScope: 1, deptIds: [] })
     setModalOpen(true)
   }
-  const openEdit = (r: Role) => {
+  const openEdit = async (r: Role) => {
     setEditing(r)
-    form.setFieldsValue(r)
+    form.setFieldsValue({ ...r, deptIds: [] })
+    // 自定义部门范围时回显已授权部门
+    if (r.dataScope === 2) {
+      const ids = await roleApi.deptIds(r.id)
+      form.setFieldsValue({ deptIds: ids })
+    }
     setModalOpen(true)
   }
   const submit = async () => {
@@ -79,6 +115,7 @@ export default function RolePage() {
     { title: 'ID', dataIndex: 'id', width: 70 },
     { title: '角色名', dataIndex: 'name' },
     { title: '标识', dataIndex: 'key' },
+    { title: '数据范围', dataIndex: 'dataScope', width: 120, render: (v: number) => <Tag>{dataScopeLabel(v)}</Tag> },
     { title: '排序', dataIndex: 'sort', width: 80 },
     { title: '状态', dataIndex: 'status', width: 90, render: (s) => <StatusTag status={s} /> },
     { title: '备注', dataIndex: 'remark', ellipsis: true },
@@ -124,6 +161,21 @@ export default function RolePage() {
           <Form.Item name="status" label="状态" initialValue={1}>
             <Select options={[{ value: 1, label: '启用' }, { value: 2, label: '停用' }]} />
           </Form.Item>
+          <Form.Item name="dataScope" label="数据范围" initialValue={1} extra="控制该角色能查看的数据行范围（部门/本人）">
+            <Select options={dataScopeOptions} />
+          </Form.Item>
+          {dataScope === 2 && (
+            <Form.Item name="deptIds" label="自定义部门" rules={[{ required: true, message: '请选择授权部门' }]}>
+              <TreeSelect
+                multiple
+                treeCheckable
+                treeData={toDeptSelect(deptTree)}
+                treeDefaultExpandAll
+                placeholder="选择该角色可查看数据的部门"
+                showCheckedStrategy={TreeSelect.SHOW_ALL}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="remark" label="备注"><Input.TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>

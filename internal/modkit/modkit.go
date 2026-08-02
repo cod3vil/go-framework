@@ -3,8 +3,12 @@
 package modkit
 
 import (
+	"context"
+
+	"github.com/cod3vil/go-framework/internal/middleware"
 	"github.com/cod3vil/go-framework/pkg/cache"
 	"github.com/cod3vil/go-framework/pkg/config"
+	"github.com/cod3vil/go-framework/pkg/datascope"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -23,6 +27,22 @@ type Kit struct {
 	Auth    gin.HandlerFunc
 	RBAC    gin.HandlerFunc
 	OperLog gin.HandlerFunc
+
+	// ResolveScope 解析指定用户的行级数据范围（由 system 模块提供）。
+	ResolveScope func(ctx context.Context, userID uint) (datascope.Scope, error)
+}
+
+// ScopeOf 解析当前请求登录用户的数据范围，业务模块用它做行级过滤：
+//
+//	scope, _ := kit.ScopeOf(c)
+//	db.Scopes(scope.GormScope("dept_id", "created_by")).Find(&rows)
+//
+// 未配置解析器时返回“全部”，保证在无数据权限需求时不影响查询。
+func (k *Kit) ScopeOf(c *gin.Context) (datascope.Scope, error) {
+	if k.ResolveScope == nil {
+		return datascope.Scope{All: true}, nil
+	}
+	return k.ResolveScope(c.Request.Context(), middleware.UserID(c))
 }
 
 // Secured 返回挂载了「认证 + RBAC + 审计」的路由分组，

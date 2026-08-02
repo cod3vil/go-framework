@@ -116,6 +116,7 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 			roles.DELETE("/:id", h.DeleteRole)
 			roles.GET("/:id/menus", h.GetRoleMenus)
 			roles.PUT("/:id/menus", h.SetRoleMenus)
+			roles.GET("/:id/depts", h.GetRoleDepts)
 			roles.GET("/:id/apis", h.GetRoleAPIs)
 			roles.PUT("/:id/apis", h.SetRoleAPIs)
 		}

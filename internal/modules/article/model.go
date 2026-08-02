@@ -12,13 +12,15 @@ const (
 
 // Article 文章模型。业务表以模块名为前缀，避免与系统表冲突。
 type Article struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	Title     string    `gorm:"size:200;not null" json:"title"`
-	Author    string    `gorm:"size:64" json:"author"`
-	Content   string    `gorm:"type:text" json:"content"`
-	Status    int8      `gorm:"default:1;index" json:"status"`
-	Views     int       `gorm:"default:0" json:"views"`
-	CreatedBy uint      `json:"createdBy"`
+	ID      uint   `gorm:"primarykey" json:"id"`
+	Title   string `gorm:"size:200;not null" json:"title"`
+	Author  string `gorm:"size:64" json:"author"`
+	Content string `gorm:"type:text" json:"content"`
+	Status  int8   `gorm:"default:1;index" json:"status"`
+	Views   int    `gorm:"default:0" json:"views"`
+	// CreatedBy / DeptID 记录归属，供行级数据权限过滤（本人 / 部门）。
+	CreatedBy uint      `gorm:"index" json:"createdBy"`
+	DeptID    uint      `gorm:"index" json:"deptId"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }

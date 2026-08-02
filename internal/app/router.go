@@ -77,14 +77,15 @@ func (a *App) registerModules(api *gin.RouterGroup) error {
 
 	// 业务模块工具箱：复用系统模块构建的认证/RBAC/审计中间件。
 	kit := &modkit.Kit{
-		DB:      a.DB,
-		Cache:   a.Cache,
-		Logger:  a.Logger,
-		Config:  a.Config,
-		API:     api,
-		Auth:    sysModule.AuthMW,
-		RBAC:    sysModule.RBACMW,
-		OperLog: sysModule.OperLogMW,
+		DB:           a.DB,
+		Cache:        a.Cache,
+		Logger:       a.Logger,
+		Config:       a.Config,
+		API:          api,
+		Auth:         sysModule.AuthMW,
+		RBAC:         sysModule.RBACMW,
+		OperLog:      sysModule.OperLogMW,
+		ResolveScope: sysModule.Service.ResolveDataScope,
 	}
 
 	// —— 在此注册业务模块（每个模块一行）——

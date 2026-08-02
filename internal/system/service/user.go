@@ -19,11 +19,21 @@ type UserQuery struct {
 	Nickname string
 	Status   int8
 	DeptID   uint
+	// Operator 发起查询的用户，用于按其数据范围过滤。
+	Operator uint
 }
 
-// ListUsers 分页查询用户。
+// ListUsers 分页查询用户，按发起者的数据范围过滤（本人以 sys_user.id 判定）。
 func (s *Service) ListUsers(ctx context.Context, q UserQuery) ([]model.SysUser, int64, error) {
 	db := s.DB.WithContext(ctx).Model(&model.SysUser{})
+	if q.Operator != 0 {
+		scope, err := s.ResolveDataScope(ctx, q.Operator)
+		if err != nil {
+			return nil, 0, errs.ErrInternal.WithCause(err)
+		}
+		// 用户表的“本人”维度是自身主键 id 而非 created_by。
+		db = db.Scopes(scope.GormScope("dept_id", "id"))
+	}
 	if q.Username != "" {
 		db = db.Where("username LIKE ?", "%"+q.Username+"%")
 	}
@@ -127,7 +137,9 @@ func (s *Service) UpdateUser(ctx context.Context, id uint, in UserInput, operato
 		"updated_by": operator,
 	}
 	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
-		if err := tx.Model(user).Updates(updates).Error; err != nil {
+		// 用干净的模型按主键更新，避免 GetUser 预加载的 Dept 归属关联
+		// 被 GORM 自动回写而覆盖 dept_id。
+		if err := tx.Model(&model.SysUser{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 			return err
 		}
 		// 内置管理员的角色固定，不随请求变更。

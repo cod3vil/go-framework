@@ -11,10 +11,13 @@ type SysRole struct {
 	Sort   int    `gorm:"default:0" json:"sort"`
 	Status int8   `gorm:"default:1" json:"status"`
 	Remark string `gorm:"size:255" json:"remark"`
-	// DataScope 数据权限范围（预留）：1 全部 2 本部门 3 本部门及以下 4 仅本人。
+	// DataScope 数据权限范围（见 pkg/datascope）：
+	// 1 全部 2 自定义部门 3 本部门 4 本部门及以下 5 仅本人。
 	DataScope int8 `gorm:"default:1" json:"dataScope"`
 
 	Menus []SysMenu `gorm:"many2many:sys_role_menu" json:"menus,omitempty"`
+	// Depts 自定义数据权限时授权的部门集合（DataScope=2 时生效）。
+	Depts []SysDept `gorm:"many2many:sys_role_dept" json:"depts,omitempty"`
 }
 
 // TableName 指定表名。

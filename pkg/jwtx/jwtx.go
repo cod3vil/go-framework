@@ -22,10 +22,11 @@ var (
 	ErrWrongType    = errors.New("jwtx: wrong token type")
 )
 
-// Claims 业务载荷：用户身份与角色，随 Access Token 下发。
+// Claims 业务载荷：用户身份、部门与角色，随 Access Token 下发。
 type Claims struct {
 	UserID    uint     `json:"uid"`
 	Username  string   `json:"uname"`
+	DeptID    uint     `json:"dept"`
 	RoleKeys  []string `json:"roles"`
 	TokenType string   `json:"typ"`
 	jwt.RegisteredClaims
@@ -57,13 +58,13 @@ type Pair struct {
 }
 
 // GeneratePair 为用户签发 Access + Refresh 令牌对。
-func (m *Manager) GeneratePair(userID uint, username string, roleKeys []string) (*Pair, error) {
-	access, err := m.generate(TypeAccess, m.accessTTL, userID, username, roleKeys)
+func (m *Manager) GeneratePair(userID uint, username string, deptID uint, roleKeys []string) (*Pair, error) {
+	access, err := m.generate(TypeAccess, m.accessTTL, userID, username, deptID, roleKeys)
 	if err != nil {
 		return nil, err
 	}
 	// Refresh Token 不携带角色，刷新时以数据库最新角色为准。
-	refresh, err := m.generate(TypeRefresh, m.refreshTTL, userID, username, nil)
+	refresh, err := m.generate(TypeRefresh, m.refreshTTL, userID, username, deptID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +75,12 @@ func (m *Manager) GeneratePair(userID uint, username string, roleKeys []string) 
 	}, nil
 }
 
-func (m *Manager) generate(typ string, ttl time.Duration, userID uint, username string, roleKeys []string) (string, error) {
+func (m *Manager) generate(typ string, ttl time.Duration, userID uint, username string, deptID uint, roleKeys []string) (string, error) {
 	now := time.Now()
 	claims := Claims{
 		UserID:    userID,
 		Username:  username,
+		DeptID:    deptID,
 		RoleKeys:  roleKeys,
 		TokenType: typ,
 		RegisteredClaims: jwt.RegisteredClaims{

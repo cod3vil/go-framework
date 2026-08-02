@@ -15,6 +15,7 @@ import (
 const (
 	CtxUserID   = "auth_user_id"
 	CtxUsername = "auth_username"
+	CtxDeptID   = "auth_dept_id"
 	CtxRoleKeys = "auth_role_keys"
 	CtxClaims   = "auth_claims"
 )
@@ -41,6 +42,7 @@ func Auth(jm *jwtx.Manager, store cache.Cache) gin.HandlerFunc {
 		}
 		c.Set(CtxUserID, claims.UserID)
 		c.Set(CtxUsername, claims.Username)
+		c.Set(CtxDeptID, claims.DeptID)
 		c.Set(CtxRoleKeys, claims.RoleKeys)
 		c.Set(CtxClaims, claims)
 		c.Next()
@@ -65,6 +67,16 @@ func abortUnauthorized(c *gin.Context) {
 // UserID 从 context 取当前登录用户 ID。
 func UserID(c *gin.Context) uint {
 	if v, ok := c.Get(CtxUserID); ok {
+		if id, ok := v.(uint); ok {
+			return id
+		}
+	}
+	return 0
+}
+
+// DeptID 从 context 取当前登录用户所属部门 ID。
+func DeptID(c *gin.Context) uint {
+	if v, ok := c.Get(CtxDeptID); ok {
 		if id, ok := v.(uint); ok {
 			return id
 		}
