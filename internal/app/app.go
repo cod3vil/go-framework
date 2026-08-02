@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -30,10 +31,21 @@ type App struct {
 	Engine *gin.Engine
 	// System 系统管理模块，暴露 Enforcer/Service 供业务模块复用。
 	System *system.Module
+	// adminFS 管理后台前端文件系统，为空时不挂载 /admin。
+	adminFS fs.FS
+}
+
+// Option 配置应用容器的可选项。
+type Option func(*App)
+
+// WithAdminFS 注入管理后台前端文件系统，挂载到 /admin。
+// 由 main 传入嵌入的 web/dist，使 app 包不依赖前端产物。
+func WithAdminFS(fsys fs.FS) Option {
+	return func(a *App) { a.adminFS = fsys }
 }
 
 // New 按序初始化各组件：配置 → 日志 → 数据库 → 缓存 → HTTP 引擎与路由。
-func New(configPath string) (*App, error) {
+func New(configPath string, opts ...Option) (*App, error) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return nil, err
@@ -69,6 +81,9 @@ func New(configPath string) (*App, error) {
 		DB:     db,
 		Cache:  c,
 		Engine: gin.New(),
+	}
+	for _, opt := range opts {
+		opt(app)
 	}
 	if err := app.setupRouter(); err != nil {
 		return nil, err

@@ -34,6 +34,7 @@ func (a *App) setupRouter() error {
 		return err
 	}
 	a.registerOpenAPI()
+	a.registerAdmin()
 	return nil
 }
 

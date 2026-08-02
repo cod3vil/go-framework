@@ -44,6 +44,27 @@ bash scripts/smoke-test.sh
 
 API 文档（Swagger UI，由路由自动生成）：启动后访问 `http://127.0.0.1:8080/swagger`。
 
+## 管理后台
+
+React 18 + TypeScript + Ant Design 5，构建产物通过 `go:embed` 打进二进制。启动服务后访问
+`http://127.0.0.1:8080/admin`（默认 admin / admin123）。已内置：登录（验证码）、动态菜单路由与
+按钮级权限、工作台，以及用户/角色/菜单/部门/字典/参数/定时任务/操作日志/登录日志/文件/服务监控
+全部管理页面。
+
+前端开发（热更新，代理到本地 Go 服务）：
+
+```bash
+make web-dev   # 或 cd web && pnpm dev，访问 http://127.0.0.1:5173/admin/
+```
+
+重建前端并打包单二进制：
+
+```bash
+make all       # = make web + make build
+```
+
+> `web/dist` 已提交入库，因此在没有 Node 环境时 `go build` 也能直接产出含完整后台的单二进制。
+
 配置文件位于 `configs/config.yaml`，所有配置可用环境变量覆盖（前缀 `APP`，层级用下划线，如 `APP_SERVER_PORT=9000`）。
 
 ## 目录结构
@@ -64,5 +85,5 @@ web/               管理后台前端（P4）
 - [x] P1 框架骨架：核心库、App 容器、中间件、健康检查
 - [x] P2 认证授权：JWT 双令牌、Casbin RBAC、用户/角色/菜单/部门
 - [x] P3 系统管理：字典、参数、审计日志、定时任务、文件上传、监控、Swagger
-- [ ] P4 管理后台前端：React + Ant Design，embed 单二进制
+- [x] P4 管理后台前端：React + Ant Design，embed 单二进制
 - [ ] P5 示例模块与文档：v0.1.0

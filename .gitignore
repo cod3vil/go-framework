@@ -1,6 +1,6 @@
 # 编译产物
 bin/
-dist/
+/dist/
 
 # 运行时数据
 data/
@@ -15,9 +15,8 @@ configs/config.local.yaml
 .vscode/
 *.swp
 
-# 前端（P4 引入 web/ 后使用）
+# 前端依赖（web/dist 已提交，以支持无 Node 的 go build）
 web/node_modules/
-web/dist/
 
 .DS_Store
 dump.rdb

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 
+	goframework "github.com/cod3vil/go-framework"
 	"github.com/cod3vil/go-framework/internal/app"
 	"github.com/cod3vil/go-framework/internal/system"
 	"github.com/cod3vil/go-framework/internal/system/model"
@@ -69,7 +70,11 @@ func main() {
 }
 
 func runServer() error {
-	a, err := app.New(configPath)
+	opts := []app.Option{}
+	if adminFS, err := goframework.AdminFS(); err == nil {
+		opts = append(opts, app.WithAdminFS(adminFS))
+	}
+	a, err := app.New(configPath, opts...)
 	if err != nil {
 		return err
 	}
