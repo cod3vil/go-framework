@@ -9,13 +9,15 @@ import "github.com/cod3vil/go-framework/internal/modkit"
 //
 //	article.Register(kit)
 func Register(kit *modkit.Kit) {
-	svc := NewService(kit.DB)
+	svc := NewService(kit)
 	h := NewHandler(svc, kit)
 
-	// 建表：业务模块自行迁移自己的表。
+	// 建表：业务模块自行迁移自己的表（主租户/public）。
 	if err := kit.DB.AutoMigrate(&Article{}); err != nil {
 		kit.Logger.Error("article 模块建表失败: " + err.Error())
 	}
+	// 登记模型：多租户开通新租户时在其 schema 内自动建表。
+	kit.RegisterModels(&Article{})
 
 	g := kit.Secured("/articles")
 	{

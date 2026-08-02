@@ -95,7 +95,8 @@ func runMigrate() error {
 	if err != nil {
 		return err
 	}
-	if err := system.Migrate(db); err != nil {
+	// 基础库（public）迁移：含租户注册表与主租户登记。
+	if err := system.MigratePublic(db); err != nil {
 		return err
 	}
 	fmt.Println("迁移完成。默认管理员: admin / admin123（生产环境请立即用 create-admin 修改密码）")

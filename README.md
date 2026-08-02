@@ -65,6 +65,20 @@ make all       # = make web + make build
 
 > `web/dist` 已提交入库，因此在没有 Node 环境时 `go build` 也能直接产出含完整后台的单二进制。
 
+## 多租户（SaaS）
+
+内置基于 PostgreSQL schema 的多租户隔离：每个租户独立 schema + 独立连接池，跨租户零串号；
+`public` 承载租户注册表与主租户。默认关闭（单租户），开启：
+
+```yaml
+tenant:
+  enabled: true   # 或环境变量 APP_TENANT_ENABLED=true（仅 PostgreSQL）
+```
+
+在后台「租户管理」开通租户会自动创建其 schema、迁移系统表与业务表并写入种子。租户用户登录时
+在登录页填写租户编码（或请求头 `X-Tenant`）。业务模块接入只需 service 用 `kit.DBOf(ctx)`
+取库并 `kit.RegisterModels(...)` 登记模型。详见 [docs/MODULE_GUIDE.md](docs/MODULE_GUIDE.md)。
+
 配置文件位于 `configs/config.yaml`，所有配置可用环境变量覆盖（前缀 `APP`，层级用下划线，如 `APP_SERVER_PORT=9000`）。
 
 ## 目录结构

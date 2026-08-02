@@ -20,7 +20,7 @@ type DictQuery struct {
 
 // ListDicts 分页查询字典类型。
 func (s *Service) ListDicts(ctx context.Context, q DictQuery) ([]model.SysDict, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysDict{})
+	db := s.db(ctx).Model(&model.SysDict{})
 	if q.Name != "" {
 		db = db.Where("name LIKE ?", "%"+q.Name+"%")
 	}
@@ -53,13 +53,13 @@ type DictInput struct {
 // CreateDict 创建字典类型。
 func (s *Service) CreateDict(ctx context.Context, in DictInput, operator uint) (*model.SysDict, error) {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysDict{}).Where("type = ?", in.Type).Count(&count)
+	s.db(ctx).Model(&model.SysDict{}).Where("type = ?", in.Type).Count(&count)
 	if count > 0 {
 		return nil, errs.New(errs.CodeConflict, "字典类型已存在")
 	}
 	dict := model.SysDict{Name: in.Name, Type: in.Type, Status: in.Status, Remark: in.Remark}
 	dict.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&dict).Error; err != nil {
+	if err := s.db(ctx).Create(&dict).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return &dict, nil
@@ -71,7 +71,7 @@ func (s *Service) UpdateDict(ctx context.Context, id uint, in DictInput, operato
 	if err := s.firstByID(ctx, &dict, id); err != nil {
 		return err
 	}
-	err := s.DB.WithContext(ctx).Model(&dict).Updates(map[string]any{
+	err := s.db(ctx).Model(&dict).Updates(map[string]any{
 		"name": in.Name, "status": in.Status, "remark": in.Remark, "updated_by": operator,
 	}).Error
 	if err != nil {
@@ -86,11 +86,11 @@ func (s *Service) DeleteDict(ctx context.Context, id uint) error {
 	if err := s.firstByID(ctx, &dict, id); err != nil {
 		return err
 	}
-	err := s.DB.WithContext(ctx).Where("dict_type = ?", dict.Type).Unscoped().Delete(&model.SysDictItem{}).Error
+	err := s.db(ctx).Where("dict_type = ?", dict.Type).Unscoped().Delete(&model.SysDictItem{}).Error
 	if err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
-	if err := s.DB.WithContext(ctx).Unscoped().Delete(&dict).Error; err != nil {
+	if err := s.db(ctx).Unscoped().Delete(&dict).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil
@@ -99,7 +99,7 @@ func (s *Service) DeleteDict(ctx context.Context, id uint) error {
 // ListDictItems 查询某字典类型下的字典项（启用项，按 sort 排序），供前端下拉框使用。
 func (s *Service) ListDictItems(ctx context.Context, dictType string) ([]model.SysDictItem, error) {
 	var items []model.SysDictItem
-	err := s.DB.WithContext(ctx).Where("dict_type = ? AND status = ?", dictType, model.StatusEnabled).
+	err := s.db(ctx).Where("dict_type = ? AND status = ?", dictType, model.StatusEnabled).
 		Order("sort, id").Find(&items).Error
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
@@ -110,7 +110,7 @@ func (s *Service) ListDictItems(ctx context.Context, dictType string) ([]model.S
 // AllDictItems 查询某字典类型下全部字典项（含停用，管理页使用）。
 func (s *Service) AllDictItems(ctx context.Context, dictType string) ([]model.SysDictItem, error) {
 	var items []model.SysDictItem
-	err := s.DB.WithContext(ctx).Where("dict_type = ?", dictType).Order("sort, id").Find(&items).Error
+	err := s.db(ctx).Where("dict_type = ?", dictType).Order("sort, id").Find(&items).Error
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
@@ -133,7 +133,7 @@ type DictItemInput struct {
 // CreateDictItem 创建字典项。
 func (s *Service) CreateDictItem(ctx context.Context, in DictItemInput, operator uint) (*model.SysDictItem, error) {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysDict{}).Where("type = ?", in.DictType).Count(&count)
+	s.db(ctx).Model(&model.SysDict{}).Where("type = ?", in.DictType).Count(&count)
 	if count == 0 {
 		return nil, errs.New(errs.CodeBadRequest, "字典类型不存在")
 	}
@@ -143,7 +143,7 @@ func (s *Service) CreateDictItem(ctx context.Context, in DictItemInput, operator
 		Status: in.Status, Remark: in.Remark,
 	}
 	item.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&item).Error; err != nil {
+	if err := s.db(ctx).Create(&item).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return &item, nil
@@ -155,7 +155,7 @@ func (s *Service) UpdateDictItem(ctx context.Context, id uint, in DictItemInput,
 	if err := s.firstByID(ctx, &item, id); err != nil {
 		return err
 	}
-	err := s.DB.WithContext(ctx).Model(&item).Updates(map[string]any{
+	err := s.db(ctx).Model(&item).Updates(map[string]any{
 		"label": in.Label, "value": in.Value, "sort": in.Sort,
 		"css_class": in.CSSClass, "list_class": in.ListClass, "is_default": in.IsDefault,
 		"status": in.Status, "remark": in.Remark, "updated_by": operator,
@@ -168,7 +168,7 @@ func (s *Service) UpdateDictItem(ctx context.Context, id uint, in DictItemInput,
 
 // DeleteDictItem 删除字典项。
 func (s *Service) DeleteDictItem(ctx context.Context, id uint) error {
-	res := s.DB.WithContext(ctx).Unscoped().Delete(&model.SysDictItem{}, id)
+	res := s.db(ctx).Unscoped().Delete(&model.SysDictItem{}, id)
 	if res.Error != nil {
 		return errs.ErrInternal.WithCause(res.Error)
 	}
@@ -180,7 +180,7 @@ func (s *Service) DeleteDictItem(ctx context.Context, id uint) error {
 
 // firstByID 通用按主键查询，未找到返回 ErrNotFound。
 func (s *Service) firstByID(ctx context.Context, dest any, id uint) error {
-	err := s.DB.WithContext(ctx).First(dest, id).Error
+	err := s.db(ctx).First(dest, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return errs.ErrNotFound
 	}

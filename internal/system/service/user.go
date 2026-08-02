@@ -25,7 +25,7 @@ type UserQuery struct {
 
 // ListUsers 分页查询用户，按发起者的数据范围过滤（本人以 sys_user.id 判定）。
 func (s *Service) ListUsers(ctx context.Context, q UserQuery) ([]model.SysUser, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysUser{})
+	db := s.db(ctx).Model(&model.SysUser{})
 	if q.Operator != 0 {
 		scope, err := s.ResolveDataScope(ctx, q.Operator)
 		if err != nil {
@@ -78,7 +78,7 @@ type UserInput struct {
 // CreateUser 创建用户并分配角色。
 func (s *Service) CreateUser(ctx context.Context, in UserInput, operator uint) (*model.SysUser, error) {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysUser{}).Where("username = ?", in.Username).Count(&count)
+	s.db(ctx).Model(&model.SysUser{}).Where("username = ?", in.Username).Count(&count)
 	if count > 0 {
 		return nil, errs.New(errs.CodeConflict, "用户名已存在")
 	}
@@ -97,7 +97,7 @@ func (s *Service) CreateUser(ctx context.Context, in UserInput, operator uint) (
 		Remark:   in.Remark,
 	}
 	user.CreatedBy = operator
-	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err = database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		if err := tx.Create(&user).Error; err != nil {
 			return err
 		}
@@ -112,7 +112,7 @@ func (s *Service) CreateUser(ctx context.Context, in UserInput, operator uint) (
 // GetUser 查询用户详情。
 func (s *Service) GetUser(ctx context.Context, id uint) (*model.SysUser, error) {
 	var user model.SysUser
-	err := s.DB.WithContext(ctx).Preload("Roles").Preload("Dept").First(&user, id).Error
+	err := s.db(ctx).Preload("Roles").Preload("Dept").First(&user, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errs.ErrNotFound
 	}
@@ -136,7 +136,7 @@ func (s *Service) UpdateUser(ctx context.Context, id uint, in UserInput, operato
 		"status": in.Status, "dept_id": in.DeptID, "remark": in.Remark,
 		"updated_by": operator,
 	}
-	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err = database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		// 用干净的模型按主键更新，避免 GetUser 预加载的 Dept 归属关联
 		// 被 GORM 自动回写而覆盖 dept_id。
 		if err := tx.Model(&model.SysUser{}).Where("id = ?", id).Updates(updates).Error; err != nil {
@@ -163,7 +163,7 @@ func (s *Service) DeleteUser(ctx context.Context, id uint) error {
 	if user.IsAdmin() {
 		return errs.New(errs.CodeForbidden, "内置管理员不允许删除")
 	}
-	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err = database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		if err := tx.Model(user).Association("Roles").Clear(); err != nil {
 			return err
 		}
@@ -185,7 +185,7 @@ func (s *Service) ResetPassword(ctx context.Context, id uint, password string, o
 	if err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
-	err = s.DB.WithContext(ctx).Model(user).
+	err = s.db(ctx).Model(user).
 		Updates(map[string]any{"password": hash, "updated_by": operator}).Error
 	if err != nil {
 		return errs.ErrInternal.WithCause(err)
@@ -202,7 +202,7 @@ func (s *Service) SetUserStatus(ctx context.Context, id uint, status int8, opera
 	if user.IsAdmin() {
 		return errs.New(errs.CodeForbidden, "内置管理员不允许停用")
 	}
-	err = s.DB.WithContext(ctx).Model(user).
+	err = s.db(ctx).Model(user).
 		Updates(map[string]any{"status": status, "updated_by": operator}).Error
 	if err != nil {
 		return errs.ErrInternal.WithCause(err)

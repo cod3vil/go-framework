@@ -20,7 +20,7 @@ type ConfigQuery struct {
 
 // ListConfigs 分页查询参数。
 func (s *Service) ListConfigs(ctx context.Context, q ConfigQuery) ([]model.SysConfig, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysConfig{})
+	db := s.db(ctx).Model(&model.SysConfig{})
 	if q.Name != "" {
 		db = db.Where("name LIKE ?", "%"+q.Name+"%")
 	}
@@ -45,7 +45,7 @@ func (s *Service) GetConfigValue(ctx context.Context, key string) (string, error
 		return val, nil
 	}
 	var cfg model.SysConfig
-	if err := s.DB.WithContext(ctx).Where("key = ?", key).First(&cfg).Error; err != nil {
+	if err := s.db(ctx).Where("key = ?", key).First(&cfg).Error; err != nil {
 		return "", errs.ErrNotFound
 	}
 	_ = s.Cache.Set(ctx, configCachePrefix+key, cfg.Value, 0)
@@ -63,13 +63,13 @@ type ConfigInput struct {
 // CreateConfig 创建参数。
 func (s *Service) CreateConfig(ctx context.Context, in ConfigInput, operator uint) (*model.SysConfig, error) {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysConfig{}).Where("key = ?", in.Key).Count(&count)
+	s.db(ctx).Model(&model.SysConfig{}).Where("key = ?", in.Key).Count(&count)
 	if count > 0 {
 		return nil, errs.New(errs.CodeConflict, "参数键已存在")
 	}
 	cfg := model.SysConfig{Name: in.Name, Key: in.Key, Value: in.Value, Remark: in.Remark}
 	cfg.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&cfg).Error; err != nil {
+	if err := s.db(ctx).Create(&cfg).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	_ = s.Cache.Set(ctx, configCachePrefix+cfg.Key, cfg.Value, 0)
@@ -82,7 +82,7 @@ func (s *Service) UpdateConfig(ctx context.Context, id uint, in ConfigInput, ope
 	if err := s.firstByID(ctx, &cfg, id); err != nil {
 		return err
 	}
-	err := s.DB.WithContext(ctx).Model(&cfg).Updates(map[string]any{
+	err := s.db(ctx).Model(&cfg).Updates(map[string]any{
 		"name": in.Name, "value": in.Value, "remark": in.Remark, "updated_by": operator,
 	}).Error
 	if err != nil {
@@ -103,7 +103,7 @@ func (s *Service) DeleteConfig(ctx context.Context, id uint) error {
 	if cfg.Builtin {
 		return errs.New(errs.CodeForbidden, "内置参数不允许删除")
 	}
-	if err := s.DB.WithContext(ctx).Unscoped().Delete(&cfg).Error; err != nil {
+	if err := s.db(ctx).Unscoped().Delete(&cfg).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	_ = s.Cache.Del(ctx, configCachePrefix+cfg.Key)

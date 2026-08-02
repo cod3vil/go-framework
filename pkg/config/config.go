@@ -19,6 +19,17 @@ type Config struct {
 	Redis    RedisConfig    `mapstructure:"redis"`
 	JWT      JWTConfig      `mapstructure:"jwt"`
 	Upload   UploadConfig   `mapstructure:"upload"`
+	Tenant   TenantConfig   `mapstructure:"tenant"`
+}
+
+// TenantConfig 多租户（SaaS）配置。仅 PostgreSQL 支持（基于 schema 隔离）。
+type TenantConfig struct {
+	// Enabled 关闭时为单租户模式，所有数据在 public schema，行为与非多租户一致。
+	Enabled bool `mapstructure:"enabled"`
+	// HeaderKey 登录等无令牌请求携带租户编码的请求头，默认 X-Tenant。
+	HeaderKey string `mapstructure:"header_key"`
+	// MaxConnsPerTenant 每个租户连接池上限，避免租户过多导致连接爆炸。
+	MaxConnsPerTenant int `mapstructure:"max_conns_per_tenant"`
 }
 
 // UploadConfig 文件上传配置。
@@ -172,4 +183,8 @@ func setDefaults(v *viper.Viper) {
 		".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
 		".txt", ".csv", ".zip", ".rar", ".mp4", ".mp3",
 	})
+
+	v.SetDefault("tenant.enabled", false)
+	v.SetDefault("tenant.header_key", "X-Tenant")
+	v.SetDefault("tenant.max_conns_per_tenant", 10)
 }

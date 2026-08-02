@@ -10,6 +10,7 @@ import (
 	"github.com/cod3vil/go-framework/internal/system/model"
 	"github.com/cod3vil/go-framework/pkg/errs"
 	"github.com/cod3vil/go-framework/pkg/jwtx"
+	"github.com/cod3vil/go-framework/pkg/tenancy"
 	"github.com/cod3vil/go-framework/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -42,7 +43,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*jwtx.Pair, error) 
 	}
 
 	var user model.SysUser
-	err := s.DB.WithContext(ctx).Preload("Roles").Where("username = ?", in.Username).First(&user).Error
+	err := s.db(ctx).Preload("Roles").Where("username = ?", in.Username).First(&user).Error
 	if err != nil || !utils.CheckPassword(user.Password, in.Password) {
 		s.recordLoginFail(ctx, in, failKey)
 		return nil, errs.New(errs.CodeBadRequest, "用户名或密码错误")
@@ -52,14 +53,14 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (*jwtx.Pair, error) 
 		return nil, errs.New(errs.CodeForbidden, "账号已停用，请联系管理员")
 	}
 
-	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, user.RoleKeys())
+	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, tenantCode(ctx), user.RoleKeys())
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 
 	_ = s.Cache.Del(ctx, failKey)
 	now := time.Now()
-	s.DB.WithContext(ctx).Model(&user).Updates(map[string]any{
+	s.db(ctx).Model(&user).Updates(map[string]any{
 		"last_login_at": now, "last_login_ip": in.IP,
 	})
 	s.writeLoginLog(ctx, in, model.LoginSuccess, "登录成功")
@@ -77,7 +78,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*jwtx.Pair,
 	}
 
 	var user model.SysUser
-	if err := s.DB.WithContext(ctx).Preload("Roles").First(&user, claims.UserID).Error; err != nil {
+	if err := s.db(ctx).Preload("Roles").First(&user, claims.UserID).Error; err != nil {
 		return nil, errs.ErrUnauthorized
 	}
 	if user.Status != model.StatusEnabled {
@@ -85,11 +86,19 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*jwtx.Pair,
 	}
 
 	s.blacklistClaims(ctx, claims)
-	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, user.RoleKeys())
+	pair, err := s.JWT.GeneratePair(user.ID, user.Username, user.DeptID, claims.Tenant, user.RoleKeys())
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return pair, nil
+}
+
+// tenantCode 从 context 取当前租户编码（多租户），非多租户返回空串。
+func tenantCode(ctx context.Context) string {
+	if t := tenancy.TenantFrom(ctx); t != nil {
+		return t.Code
+	}
+	return ""
 }
 
 // Logout 登出：将当前 Access Token（及可选的 Refresh Token）加入黑名单。
@@ -124,7 +133,7 @@ type UserInfoOutput struct {
 // UserInfo 返回当前用户的资料、角色、权限标识与可见菜单树。
 func (s *Service) UserInfo(ctx context.Context, userID uint) (*UserInfoOutput, error) {
 	var user model.SysUser
-	if err := s.DB.WithContext(ctx).Preload("Roles").Preload("Dept").First(&user, userID).Error; err != nil {
+	if err := s.db(ctx).Preload("Roles").Preload("Dept").First(&user, userID).Error; err != nil {
 		return nil, errs.ErrNotFound.WithCause(err)
 	}
 
@@ -157,7 +166,7 @@ func (s *Service) UserInfo(ctx context.Context, userID uint) (*UserInfoOutput, e
 
 // menusForUser 返回用户可用的全部菜单（admin 为全量，其余按角色并集）。
 func (s *Service) menusForUser(ctx context.Context, user *model.SysUser) ([]*model.SysMenu, error) {
-	db := s.DB.WithContext(ctx)
+	db := s.db(ctx)
 	var menus []*model.SysMenu
 	if user.IsAdmin() {
 		err := db.Where("status = ?", model.StatusEnabled).Order("sort, id").Find(&menus).Error
@@ -204,7 +213,7 @@ func (s *Service) writeLoginLog(ctx context.Context, in LoginInput, status int8,
 		Status:    status,
 		Msg:       msg,
 	}
-	if err := s.DB.WithContext(ctx).Create(&log).Error; err != nil {
+	if err := s.db(ctx).Create(&log).Error; err != nil {
 		s.Logger.Warn("写登录日志失败", zap.Error(err))
 	}
 }

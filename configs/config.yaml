@@ -46,6 +46,11 @@ jwt:
   refresh_expire: 10080 # 分钟（7 天）
   issuer: go-framework
 
+tenant:
+  enabled: false # 多租户开关（仅 PostgreSQL）。开启后各租户数据按 schema 隔离
+  header_key: X-Tenant # 登录等无令牌请求携带租户编码的请求头
+  max_conns_per_tenant: 10 # 每个租户连接池上限
+
 upload:
   driver: local # 当前支持 local（预留 oss/s3）
   dir: data/uploads # 本地存储根目录

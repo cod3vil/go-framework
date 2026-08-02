@@ -21,7 +21,7 @@ type RoleQuery struct {
 
 // ListRoles 分页查询角色。
 func (s *Service) ListRoles(ctx context.Context, q RoleQuery) ([]model.SysRole, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysRole{})
+	db := s.db(ctx).Model(&model.SysRole{})
 	if q.Name != "" {
 		db = db.Where("name LIKE ?", "%"+q.Name+"%")
 	}
@@ -55,7 +55,7 @@ type RoleInput struct {
 // CreateRole 创建角色。
 func (s *Service) CreateRole(ctx context.Context, in RoleInput, operator uint) (*model.SysRole, error) {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysRole{}).Where("key = ?", in.Key).Count(&count)
+	s.db(ctx).Model(&model.SysRole{}).Where("key = ?", in.Key).Count(&count)
 	if count > 0 {
 		return nil, errs.New(errs.CodeConflict, "角色标识已存在")
 	}
@@ -67,7 +67,7 @@ func (s *Service) CreateRole(ctx context.Context, in RoleInput, operator uint) (
 		Remark: in.Remark, DataScope: in.DataScope,
 	}
 	role.CreatedBy = operator
-	err := database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err := database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		if err := tx.Create(&role).Error; err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func (s *Service) CreateRole(ctx context.Context, in RoleInput, operator uint) (
 // GetRole 查询角色详情。
 func (s *Service) GetRole(ctx context.Context, id uint) (*model.SysRole, error) {
 	var role model.SysRole
-	err := s.DB.WithContext(ctx).First(&role, id).Error
+	err := s.db(ctx).First(&role, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errs.ErrNotFound
 	}
@@ -104,7 +104,7 @@ func (s *Service) UpdateRole(ctx context.Context, id uint, in RoleInput, operato
 	if in.DataScope == 0 {
 		in.DataScope = datascope.ScopeAll
 	}
-	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err = database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		if err := tx.Model(role).Updates(map[string]any{
 			"name": in.Name, "sort": in.Sort, "status": in.Status,
 			"remark": in.Remark, "data_scope": in.DataScope, "updated_by": operator,
@@ -151,11 +151,11 @@ func (s *Service) DeleteRole(ctx context.Context, id uint) error {
 		return errs.New(errs.CodeForbidden, "超级管理员角色不允许删除")
 	}
 	var cnt int64
-	s.DB.WithContext(ctx).Table("sys_user_role").Where("sys_role_id = ?", id).Count(&cnt)
+	s.db(ctx).Table("sys_user_role").Where("sys_role_id = ?", id).Count(&cnt)
 	if cnt > 0 {
 		return errs.New(errs.CodeConflict, "角色已分配给用户，无法删除")
 	}
-	err = database.Tx(ctx, s.DB, func(tx *gorm.DB) error {
+	err = database.Tx(ctx, s.db(ctx), func(tx *gorm.DB) error {
 		if err := tx.Model(role).Association("Menus").Clear(); err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func (s *Service) GetRoleMenuIDs(ctx context.Context, id uint) ([]uint, error) {
 		return nil, err
 	}
 	ids := make([]uint, 0)
-	err := s.DB.WithContext(ctx).Table("sys_role_menu").
+	err := s.db(ctx).Table("sys_role_menu").
 		Where("sys_role_id = ?", id).Pluck("sys_menu_id", &ids).Error
 	if err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
@@ -195,11 +195,11 @@ func (s *Service) SetRoleMenus(ctx context.Context, id uint, menuIDs []uint) err
 	}
 	menus := make([]model.SysMenu, 0, len(menuIDs))
 	if len(menuIDs) > 0 {
-		if err := s.DB.WithContext(ctx).Find(&menus, menuIDs).Error; err != nil {
+		if err := s.db(ctx).Find(&menus, menuIDs).Error; err != nil {
 			return errs.ErrInternal.WithCause(err)
 		}
 	}
-	if err := s.DB.WithContext(ctx).Model(role).Association("Menus").Replace(menus); err != nil {
+	if err := s.db(ctx).Model(role).Association("Menus").Replace(menus); err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil

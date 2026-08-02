@@ -15,7 +15,7 @@ func (s *Service) InitJobs(ctx context.Context) error {
 	s.Cron.SetResultHook(s.recordJobResult)
 
 	var jobs []model.SysJob
-	if err := s.DB.WithContext(ctx).Where("status = ?", model.StatusEnabled).Find(&jobs).Error; err != nil {
+	if err := s.db(ctx).Where("status = ?", model.StatusEnabled).Find(&jobs).Error; err != nil {
 		return err
 	}
 	for _, job := range jobs {
@@ -38,7 +38,7 @@ func (s *Service) recordJobResult(r cronx.Result) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := s.DB.WithContext(ctx).Create(&log).Error; err != nil {
+	if err := s.db(ctx).Create(&log).Error; err != nil {
 		s.Logger.Warn("写任务执行日志失败", zap.Error(err))
 	}
 }
@@ -53,7 +53,7 @@ type JobQuery struct {
 
 // ListJobs 分页查询任务。
 func (s *Service) ListJobs(ctx context.Context, q JobQuery) ([]model.SysJob, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysJob{})
+	db := s.db(ctx).Model(&model.SysJob{})
 	if q.Name != "" {
 		db = db.Where("name LIKE ?", "%"+q.Name+"%")
 	}
@@ -103,7 +103,7 @@ func (s *Service) CreateJob(ctx context.Context, in JobInput, operator uint) (*m
 	}
 	job := model.SysJob{Name: in.Name, JobKey: in.JobKey, CronExpr: in.CronExpr, Status: in.Status, Remark: in.Remark}
 	job.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&job).Error; err != nil {
+	if err := s.db(ctx).Create(&job).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	if job.Status == model.StatusEnabled {
@@ -123,7 +123,7 @@ func (s *Service) UpdateJob(ctx context.Context, id uint, in JobInput, operator 
 	if err := s.firstByID(ctx, &job, id); err != nil {
 		return err
 	}
-	err := s.DB.WithContext(ctx).Model(&job).Updates(map[string]any{
+	err := s.db(ctx).Model(&job).Updates(map[string]any{
 		"name": in.Name, "job_key": in.JobKey, "cron_expr": in.CronExpr,
 		"status": in.Status, "remark": in.Remark, "updated_by": operator,
 	}).Error
@@ -146,7 +146,7 @@ func (s *Service) SetJobStatus(ctx context.Context, id uint, status int8, operat
 	if err := s.firstByID(ctx, &job, id); err != nil {
 		return err
 	}
-	if err := s.DB.WithContext(ctx).Model(&job).Updates(map[string]any{"status": status, "updated_by": operator}).Error; err != nil {
+	if err := s.db(ctx).Model(&job).Updates(map[string]any{"status": status, "updated_by": operator}).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	if status == model.StatusEnabled {
@@ -166,7 +166,7 @@ func (s *Service) DeleteJob(ctx context.Context, id uint) error {
 		return err
 	}
 	s.Cron.Unschedule(id)
-	if err := s.DB.WithContext(ctx).Unscoped().Delete(&job).Error; err != nil {
+	if err := s.db(ctx).Unscoped().Delete(&job).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil
@@ -193,7 +193,7 @@ type JobLogQuery struct {
 
 // ListJobLogs 分页查询任务执行日志（按时间倒序）。
 func (s *Service) ListJobLogs(ctx context.Context, q JobLogQuery) ([]model.SysJobLog, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysJobLog{})
+	db := s.db(ctx).Model(&model.SysJobLog{})
 	if q.JobID != 0 {
 		db = db.Where("job_id = ?", q.JobID)
 	}

@@ -7,11 +7,14 @@ import (
 	"github.com/cod3vil/go-framework/internal/middleware"
 	"github.com/cod3vil/go-framework/internal/system/model"
 	"github.com/cod3vil/go-framework/pkg/errs"
+	"github.com/cod3vil/go-framework/pkg/tenancy"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // RecordOperLog 异步落库一条操作日志，作为 middleware.OperLogRecorder 使用。
-// 用独立 context，避免请求结束后 context 取消导致写入失败。
+// 用独立 context，避免请求结束后 context 取消导致写入失败；
+// 多租户下按 entry 携带的 schema 写入对应租户库。
 func (s *Service) RecordOperLog(e middleware.OperLogEntry) {
 	go func() {
 		log := model.SysOperLog{
@@ -21,10 +24,22 @@ func (s *Service) RecordOperLog(e middleware.OperLogEntry) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := s.DB.WithContext(ctx).Create(&log).Error; err != nil {
+		db := s.dbForSchema(e.TenantSchema).WithContext(ctx)
+		if err := db.Create(&log).Error; err != nil {
 			s.Logger.Warn("写操作日志失败", zap.Error(err))
 		}
 	}()
+}
+
+// dbForSchema 返回指定 schema 的库句柄；空或 public 或未启用多租户时返回基础库。
+func (s *Service) dbForSchema(schema string) *gorm.DB {
+	if schema == "" || schema == tenancy.PrimarySchema || !s.TenantEnabled() {
+		return s.DB
+	}
+	if db, err := s.Tenancy.DB(schema); err == nil {
+		return db
+	}
+	return s.DB
 }
 
 // OperLogQuery 操作日志查询条件。
@@ -38,7 +53,7 @@ type OperLogQuery struct {
 
 // ListOperLogs 分页查询操作日志（按时间倒序）。
 func (s *Service) ListOperLogs(ctx context.Context, q OperLogQuery) ([]model.SysOperLog, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysOperLog{})
+	db := s.db(ctx).Model(&model.SysOperLog{})
 	if q.Username != "" {
 		db = db.Where("username LIKE ?", "%"+q.Username+"%")
 	}
@@ -62,7 +77,7 @@ func (s *Service) ListOperLogs(ctx context.Context, q OperLogQuery) ([]model.Sys
 
 // ClearOperLogs 清空全部操作日志。
 func (s *Service) ClearOperLogs(ctx context.Context) error {
-	if err := s.DB.WithContext(ctx).Where("1 = 1").Delete(&model.SysOperLog{}).Error; err != nil {
+	if err := s.db(ctx).Where("1 = 1").Delete(&model.SysOperLog{}).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil
@@ -78,7 +93,7 @@ type LoginLogQuery struct {
 
 // ListLoginLogs 分页查询登录日志（按时间倒序）。
 func (s *Service) ListLoginLogs(ctx context.Context, q LoginLogQuery) ([]model.SysLoginLog, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysLoginLog{})
+	db := s.db(ctx).Model(&model.SysLoginLog{})
 	if q.Username != "" {
 		db = db.Where("username LIKE ?", "%"+q.Username+"%")
 	}
@@ -99,7 +114,7 @@ func (s *Service) ListLoginLogs(ctx context.Context, q LoginLogQuery) ([]model.S
 
 // ClearLoginLogs 清空全部登录日志。
 func (s *Service) ClearLoginLogs(ctx context.Context) error {
-	if err := s.DB.WithContext(ctx).Where("1 = 1").Delete(&model.SysLoginLog{}).Error; err != nil {
+	if err := s.db(ctx).Where("1 = 1").Delete(&model.SysLoginLog{}).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil

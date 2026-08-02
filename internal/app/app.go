@@ -17,6 +17,7 @@ import (
 	"github.com/cod3vil/go-framework/pkg/config"
 	"github.com/cod3vil/go-framework/pkg/database"
 	"github.com/cod3vil/go-framework/pkg/logger"
+	"github.com/cod3vil/go-framework/pkg/tenancy"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -31,6 +32,8 @@ type App struct {
 	Engine *gin.Engine
 	// System 系统管理模块，暴露 Enforcer/Service 供业务模块复用。
 	System *system.Module
+	// Tenancy 多租户库管理器，未启用时为 nil。
+	Tenancy *tenancy.Manager
 	// adminFS 管理后台前端文件系统，为空时不挂载 /admin。
 	adminFS fs.FS
 }
@@ -82,6 +85,17 @@ func New(configPath string, opts ...Option) (*App, error) {
 		Cache:  c,
 		Engine: gin.New(),
 	}
+
+	// 多租户：启用且为 PostgreSQL 时创建租户库管理器。
+	if cfg.Tenant.Enabled {
+		mgr := tenancy.NewManager(cfg.Database, cfg.Tenant.MaxConnsPerTenant)
+		if !mgr.Supported() {
+			return nil, fmt.Errorf("多租户仅支持 PostgreSQL，当前驱动: %s", cfg.Database.Driver)
+		}
+		app.Tenancy = mgr
+		log.Info("多租户已启用（PostgreSQL schema 隔离）")
+	}
+
 	for _, opt := range opts {
 		opt(app)
 	}
@@ -153,6 +167,9 @@ func (a *App) Run() error {
 func (a *App) close() {
 	if a.System != nil {
 		a.System.Stop() // 停止 cron 调度，等待执行中的任务完成
+	}
+	if a.Tenancy != nil {
+		a.Tenancy.Close() // 关闭所有租户连接池
 	}
 	if a.Cache != nil {
 		if err := a.Cache.Close(); err != nil {

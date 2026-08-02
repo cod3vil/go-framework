@@ -34,6 +34,31 @@ func Migrate(db *gorm.DB) error {
 	return seed(db)
 }
 
+// MigratePublic 迁移 public schema：在 Migrate 基础上额外建立租户注册表并登记主租户。
+// 仅用于基础库（public），租户 schema 不含注册表。
+func MigratePublic(db *gorm.DB) error {
+	if err := Migrate(db); err != nil {
+		return err
+	}
+	if err := db.AutoMigrate(&model.SysTenant{}); err != nil {
+		return fmt.Errorf("迁移租户注册表失败: %w", err)
+	}
+	return seedPrimaryTenant(db)
+}
+
+// seedPrimaryTenant 登记主租户（public），幂等。
+func seedPrimaryTenant(db *gorm.DB) error {
+	var count int64
+	db.Model(&model.SysTenant{}).Where("code = ?", "primary").Count(&count)
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&model.SysTenant{
+		Code: "primary", Name: "主租户", Schema: "public",
+		Status: model.StatusEnabled, Primary: true, Remark: "内置主租户，不可删除",
+	}).Error
+}
+
 func seed(db *gorm.DB) error {
 	if err := seedDept(db); err != nil {
 		return err
@@ -177,6 +202,8 @@ func seedMenus(db *gorm.DB) error {
 			[]string{"query", "upload", "del"}},
 		{"服务监控", "SystemMonitor", "monitor", "system/monitor/index", "system:monitor",
 			[]string{"query"}},
+		{"租户管理", "SystemTenant", "tenant", "system/tenant/index", "system:tenant",
+			[]string{"query", "add", "status", "del"}},
 	}
 	buttonTitles := map[string]string{
 		"query": "查询", "add": "新增", "edit": "修改", "del": "删除",

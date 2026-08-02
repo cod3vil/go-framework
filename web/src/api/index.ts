@@ -2,18 +2,33 @@
 import { request } from './request'
 import type {
   Article, Config, Dept, Dict, DictItem, FileItem, Job, JobLog, LoginLog, Menu,
-  OperLog, PageResult, Role, ServerStat, TokenPair, User, UserInfo,
+  OperLog, PageResult, Role, ServerStat, Tenant, TokenPair, User, UserInfo,
 } from '@/types'
 
 type Query = Record<string, unknown>
 
+// tenantHeader 构造携带租户编码的请求头（登录/验证码时路由到对应租户库）。
+function tenantHeader(tenant?: string): Record<string, string> {
+  return tenant ? { 'X-Tenant': tenant } : {}
+}
+
 // ---- 认证 ----
 export const authApi = {
-  captcha: () => request<{ captchaId: string; captchaImg: string; enabled: boolean }>({ url: '/auth/captcha' }),
-  login: (data: { username: string; password: string; captchaId: string; captchaCode: string }) =>
-    request<TokenPair>({ url: '/auth/login', method: 'post', data }),
+  tenantEnabled: () => request<{ enabled: boolean }>({ url: '/tenant-enabled' }),
+  captcha: (tenant?: string) =>
+    request<{ captchaId: string; captchaImg: string; enabled: boolean }>({ url: '/auth/captcha', headers: tenantHeader(tenant) }),
+  login: (data: { username: string; password: string; captchaId: string; captchaCode: string }, tenant?: string) =>
+    request<TokenPair>({ url: '/auth/login', method: 'post', data, headers: tenantHeader(tenant) }),
   logout: () => request({ url: '/auth/logout', method: 'post', data: { refreshToken: localStorage.getItem('gf_refresh_token') } }),
   userInfo: () => request<UserInfo>({ url: '/auth/userinfo' }),
+}
+
+// ---- 租户（平台级）----
+export const tenantApi = {
+  list: (params: Query) => request<PageResult<Tenant>>({ url: '/system/tenants', params }),
+  create: (data: Query) => request({ url: '/system/tenants', method: 'post', data }),
+  setStatus: (id: number, status: number) => request({ url: `/system/tenants/${id}/status`, method: 'put', data: { status } }),
+  remove: (id: number) => request({ url: `/system/tenants/${id}`, method: 'delete' }),
 }
 
 // ---- 用户 ----

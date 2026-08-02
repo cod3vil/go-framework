@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Form, Input, App as AntdApp } from 'antd'
-import { LockOutlined, UserOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { LockOutlined, UserOutlined, SafetyCertificateOutlined, ClusterOutlined } from '@ant-design/icons'
 import { authApi } from '@/api'
 import { tokenStore } from '@/api/request'
 import { useAuthStore } from '@/store/auth'
@@ -12,10 +12,12 @@ export default function Login() {
   const fetchUserInfo = useAuthStore((s) => s.fetchUserInfo)
   const [loading, setLoading] = useState(false)
   const [captcha, setCaptcha] = useState<{ id: string; img: string; enabled: boolean }>({ id: '', img: '', enabled: true })
+  const [multiTenant, setMultiTenant] = useState(false)
+  const [tenant, setTenant] = useState('')
 
-  const refreshCaptcha = async () => {
+  const refreshCaptcha = async (tenantCode = tenant) => {
     try {
-      const c = await authApi.captcha()
+      const c = await authApi.captcha(tenantCode || undefined)
       setCaptcha({ id: c.captchaId, img: c.captchaImg, enabled: c.enabled })
     } catch {
       // 忽略：登录时会给出提示
@@ -23,24 +25,26 @@ export default function Login() {
   }
 
   useEffect(() => {
+    authApi.tenantEnabled().then((r) => setMultiTenant(r.enabled)).catch(() => {})
     refreshCaptcha()
   }, [])
 
-  const onFinish = async (values: { username: string; password: string; captchaCode?: string }) => {
+  const onFinish = async (values: { username: string; password: string; captchaCode?: string; tenant?: string }) => {
     setLoading(true)
+    const tenantCode = values.tenant || ''
     try {
       const pair = await authApi.login({
         username: values.username,
         password: values.password,
         captchaId: captcha.id,
         captchaCode: values.captchaCode || '',
-      })
+      }, tenantCode || undefined)
       tokenStore.set(pair.accessToken, pair.refreshToken)
       await fetchUserInfo()
       message.success('登录成功')
       navigate('/dashboard', { replace: true })
     } catch {
-      refreshCaptcha()
+      refreshCaptcha(tenantCode)
     } finally {
       setLoading(false)
     }
@@ -60,6 +64,15 @@ export default function Login() {
         <h2 style={{ textAlign: 'center', marginBottom: 8 }}>go-framework</h2>
         <p style={{ textAlign: 'center', color: '#888', marginTop: 0 }}>企业级管理后台</p>
         <Form onFinish={onFinish} size="large" initialValues={{ username: 'admin', password: 'admin123' }}>
+          {multiTenant && (
+            <Form.Item name="tenant" extra="留空登录主租户">
+              <Input
+                prefix={<ClusterOutlined />}
+                placeholder="租户编码（如 acme，留空为主租户）"
+                onBlur={(e) => { setTenant(e.target.value); refreshCaptcha(e.target.value) }}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input prefix={<UserOutlined />} placeholder="用户名" />
           </Form.Item>
@@ -77,7 +90,7 @@ export default function Login() {
                       src={captcha.img}
                       alt="验证码"
                       style={{ height: 32, cursor: 'pointer' }}
-                      onClick={refreshCaptcha}
+                      onClick={() => refreshCaptcha()}
                       title="点击刷新"
                     />
                   ) : null

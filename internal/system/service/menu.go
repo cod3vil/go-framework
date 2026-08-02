@@ -12,7 +12,7 @@ import (
 // MenuTree 查询全量菜单树（管理页使用，含按钮与隐藏项）。
 func (s *Service) MenuTree(ctx context.Context) ([]*model.SysMenu, error) {
 	var menus []*model.SysMenu
-	if err := s.DB.WithContext(ctx).Order("sort, id").Find(&menus).Error; err != nil {
+	if err := s.db(ctx).Order("sort, id").Find(&menus).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return buildMenuTree(menus, 0), nil
@@ -42,7 +42,7 @@ func (s *Service) CreateMenu(ctx context.Context, in MenuInput, operator uint) (
 		Sort: in.Sort, Visible: in.Visible, Status: in.Status, KeepAlive: in.KeepAlive,
 	}
 	menu.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&menu).Error; err != nil {
+	if err := s.db(ctx).Create(&menu).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return &menu, nil
@@ -51,7 +51,7 @@ func (s *Service) CreateMenu(ctx context.Context, in MenuInput, operator uint) (
 // UpdateMenu 更新菜单。
 func (s *Service) UpdateMenu(ctx context.Context, id uint, in MenuInput, operator uint) error {
 	var menu model.SysMenu
-	err := s.DB.WithContext(ctx).First(&menu, id).Error
+	err := s.db(ctx).First(&menu, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return errs.ErrNotFound
 	}
@@ -61,7 +61,7 @@ func (s *Service) UpdateMenu(ctx context.Context, id uint, in MenuInput, operato
 	if in.ParentID == id {
 		return errs.New(errs.CodeBadRequest, "上级菜单不能是自身")
 	}
-	err = s.DB.WithContext(ctx).Model(&menu).Updates(map[string]any{
+	err = s.db(ctx).Model(&menu).Updates(map[string]any{
 		"parent_id": in.ParentID, "title": in.Title, "name": in.Name, "type": in.Type,
 		"path": in.Path, "component": in.Component, "perm": in.Perm, "icon": in.Icon,
 		"sort": in.Sort, "visible": in.Visible, "status": in.Status,
@@ -76,15 +76,15 @@ func (s *Service) UpdateMenu(ctx context.Context, id uint, in MenuInput, operato
 // DeleteMenu 删除菜单；存在子菜单时拒绝。
 func (s *Service) DeleteMenu(ctx context.Context, id uint) error {
 	var count int64
-	s.DB.WithContext(ctx).Model(&model.SysMenu{}).Where("parent_id = ?", id).Count(&count)
+	s.db(ctx).Model(&model.SysMenu{}).Where("parent_id = ?", id).Count(&count)
 	if count > 0 {
 		return errs.New(errs.CodeConflict, "存在子菜单，无法删除")
 	}
-	err := s.DB.WithContext(ctx).Exec("DELETE FROM sys_role_menu WHERE sys_menu_id = ?", id).Error
+	err := s.db(ctx).Exec("DELETE FROM sys_role_menu WHERE sys_menu_id = ?", id).Error
 	if err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
-	res := s.DB.WithContext(ctx).Unscoped().Delete(&model.SysMenu{}, id)
+	res := s.db(ctx).Unscoped().Delete(&model.SysMenu{}, id)
 	if res.Error != nil {
 		return errs.ErrInternal.WithCause(res.Error)
 	}

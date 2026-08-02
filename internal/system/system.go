@@ -17,6 +17,7 @@ import (
 	"github.com/cod3vil/go-framework/pkg/cronx"
 	"github.com/cod3vil/go-framework/pkg/jwtx"
 	"github.com/cod3vil/go-framework/pkg/response"
+	"github.com/cod3vil/go-framework/pkg/tenancy"
 	"github.com/cod3vil/go-framework/pkg/upload"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -30,6 +31,10 @@ type Options struct {
 	Logger *zap.Logger
 	Config *config.Config
 	Engine *gin.Engine
+	// Tenancy 多租户库管理器（可为 nil，表示单租户）。
+	Tenancy *tenancy.Manager
+	// TenantModels 业务模块登记的模型指针，开通新租户时在其 schema 内建表。
+	TenantModels *[]any
 }
 
 // Module 已装配的系统模块，暴露 Service/Enforcer/Cron 供其他模块复用与生命周期管理。
@@ -37,10 +42,11 @@ type Module struct {
 	Service  *service.Service
 	Enforcer *casbin.Enforcer
 	Cron     *cronx.Manager
-	// 共享中间件，供业务模块经 modkit 复用（认证/RBAC/写操作审计）。
+	// 共享中间件，供业务模块经 modkit 复用（认证/RBAC/写操作审计/租户路由）。
 	AuthMW    gin.HandlerFunc
 	RBACMW    gin.HandlerFunc
 	OperLogMW gin.HandlerFunc
+	TenantMW  gin.HandlerFunc
 }
 
 // Register 装配系统模块并注册路由到 api 分组（通常为 /api/v1）。
@@ -68,6 +74,21 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		Captcha:  captcha.New(opt.Cache),
 		Cron:     cronManager,
 		Uploader: uploader,
+		Tenancy:  opt.Tenancy,
+	}
+	// 开通新租户时在其 schema 内建系统表+种子，并迁移业务模块登记的模型。
+	svc.MigrateTenant = func(tdb *gorm.DB) error {
+		if err := Migrate(tdb); err != nil {
+			return err
+		}
+		if opt.TenantModels != nil {
+			for _, m := range *opt.TenantModels {
+				if err := tdb.AutoMigrate(m); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	}
 	h := handler.New(svc)
 
@@ -80,22 +101,31 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 	rbacMW := middleware.Casbin(enforcer, model.AdminRoleKey, opt.Logger)
 	operLogMW := middleware.OperLog(svc.RecordOperLog)
 
-	// 认证接口：无需登录。
-	auth := api.Group("/auth")
+	// 租户路由中间件：启用多租户时按 JWT/请求头解析租户并注入库句柄；否则空操作。
+	tenantMW := func(c *gin.Context) { c.Next() }
+	if svc.TenantEnabled() {
+		tenantMW = middleware.Tenant(svc, opt.Config.Tenant.HeaderKey)
+	}
+
+	// 多租户开关探测（公开，供前端登录页决定是否显示租户输入）。
+	api.GET("/tenant-enabled", h.TenantEnabled)
+
+	// 认证接口：无需登录，但需先解析租户（登录时按请求头路由到对应租户库）。
+	auth := api.Group("/auth", tenantMW)
 	{
 		auth.GET("/captcha", h.Captcha)
 		auth.POST("/login", h.Login)
 		auth.POST("/refresh", h.Refresh)
 	}
 	// 需登录、无需 RBAC 的接口。
-	authed := api.Group("/auth", authMW)
+	authed := api.Group("/auth", authMW, tenantMW)
 	{
 		authed.POST("/logout", h.Logout)
 		authed.GET("/userinfo", h.UserInfo)
 	}
 
-	// 系统管理接口：登录 + RBAC + 写操作审计。
-	sys := api.Group("/system", authMW, rbacMW, operLogMW)
+	// 系统管理接口：登录 + 租户路由 + RBAC + 写操作审计。
+	sys := api.Group("/system", authMW, tenantMW, rbacMW, operLogMW)
 	{
 		users := sys.Group("/users")
 		{
@@ -186,6 +216,15 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		}
 		sys.GET("/monitor/server", h.ServerMonitor)
 
+		// 租户管理（平台级，作用于 public 注册表）。
+		tenants := sys.Group("/tenants")
+		{
+			tenants.GET("", h.ListTenants)
+			tenants.POST("", h.CreateTenant)
+			tenants.PUT("/:id/status", h.SetTenantStatus)
+			tenants.DELETE("/:id", h.DeleteTenant)
+		}
+
 		// 已注册 API 清单，供角色管理页勾选 API 权限。
 		sys.GET("/apis", listAPIs(opt.Engine))
 	}
@@ -197,6 +236,7 @@ func Register(api *gin.RouterGroup, opt Options) (*Module, error) {
 		AuthMW:    authMW,
 		RBACMW:    rbacMW,
 		OperLogMW: operLogMW,
+		TenantMW:  tenantMW,
 	}, nil
 }
 

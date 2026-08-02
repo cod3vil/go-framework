@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cod3vil/go-framework/internal/modkit"
 	"github.com/cod3vil/go-framework/pkg/datascope"
 	"github.com/cod3vil/go-framework/pkg/errs"
 	"gorm.io/gorm"
@@ -16,11 +17,14 @@ const (
 
 // Service 文章业务逻辑。
 type Service struct {
-	db *gorm.DB
+	kit *modkit.Kit
 }
 
-// NewService 创建服务。
-func NewService(db *gorm.DB) *Service { return &Service{db: db} }
+// NewService 创建服务。通过 kit.DBOf(ctx) 取库以获得多租户隔离。
+func NewService(kit *modkit.Kit) *Service { return &Service{kit: kit} }
+
+// db 返回当前请求应使用的库（多租户下为对应租户库）。
+func (s *Service) db(ctx context.Context) *gorm.DB { return s.kit.DBOf(ctx) }
 
 // Query 列表查询条件。
 type Query struct {
@@ -32,7 +36,7 @@ type Query struct {
 
 // List 分页查询文章，按传入的数据范围过滤（部门维度 dept_id，本人维度 created_by）。
 func (s *Service) List(ctx context.Context, q Query, scope datascope.Scope) ([]Article, int64, error) {
-	db := s.db.WithContext(ctx).Model(&Article{}).Scopes(scope.GormScope("dept_id", "created_by"))
+	db := s.db(ctx).Model(&Article{}).Scopes(scope.GormScope("dept_id", "created_by"))
 	if q.Title != "" {
 		db = db.Where("title LIKE ?", "%"+q.Title+"%")
 	}
@@ -54,7 +58,7 @@ func (s *Service) List(ctx context.Context, q Query, scope datascope.Scope) ([]A
 // Get 查询文章详情并自增浏览量。
 func (s *Service) Get(ctx context.Context, id uint) (*Article, error) {
 	var a Article
-	err := s.db.WithContext(ctx).First(&a, id).Error
+	err := s.db(ctx).First(&a, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errs.New(codeArticleNotFound, "文章不存在")
 	}
@@ -62,7 +66,7 @@ func (s *Service) Get(ctx context.Context, id uint) (*Article, error) {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	// 自增浏览量，并在返回值中体现本次访问后的最新值。
-	s.db.WithContext(ctx).Model(&a).UpdateColumn("views", gorm.Expr("views + 1"))
+	s.db(ctx).Model(&a).UpdateColumn("views", gorm.Expr("views + 1"))
 	a.Views++
 	return &a, nil
 }
@@ -81,7 +85,7 @@ func (s *Service) Create(ctx context.Context, in Input, operator, deptID uint) (
 		Title: in.Title, Author: in.Author, Content: in.Content,
 		Status: in.Status, CreatedBy: operator, DeptID: deptID,
 	}
-	if err := s.db.WithContext(ctx).Create(&a).Error; err != nil {
+	if err := s.db(ctx).Create(&a).Error; err != nil {
 		return nil, errs.ErrInternal.WithCause(err)
 	}
 	return &a, nil
@@ -89,7 +93,7 @@ func (s *Service) Create(ctx context.Context, in Input, operator, deptID uint) (
 
 // Update 更新文章。
 func (s *Service) Update(ctx context.Context, id uint, in Input) error {
-	res := s.db.WithContext(ctx).Model(&Article{}).Where("id = ?", id).Updates(map[string]any{
+	res := s.db(ctx).Model(&Article{}).Where("id = ?", id).Updates(map[string]any{
 		"title": in.Title, "author": in.Author, "content": in.Content, "status": in.Status,
 	})
 	if res.Error != nil {
@@ -103,7 +107,7 @@ func (s *Service) Update(ctx context.Context, id uint, in Input) error {
 
 // Delete 删除文章。
 func (s *Service) Delete(ctx context.Context, id uint) error {
-	res := s.db.WithContext(ctx).Delete(&Article{}, id)
+	res := s.db(ctx).Delete(&Article{}, id)
 	if res.Error != nil {
 		return errs.ErrInternal.WithCause(res.Error)
 	}

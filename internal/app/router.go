@@ -63,19 +63,24 @@ func (a *App) registerHealth(api *gin.RouterGroup) {
 
 // registerModules 挂载系统模块与业务模块，新模块在此追加注册。
 func (a *App) registerModules(api *gin.RouterGroup) error {
+	// 业务模块模型登记表：开通新租户时用于在其 schema 内建业务表。
+	tenantModels := &[]any{}
+
 	sysModule, err := system.Register(api, system.Options{
-		DB:     a.DB,
-		Cache:  a.Cache,
-		Logger: a.Logger,
-		Config: a.Config,
-		Engine: a.Engine,
+		DB:           a.DB,
+		Cache:        a.Cache,
+		Logger:       a.Logger,
+		Config:       a.Config,
+		Engine:       a.Engine,
+		Tenancy:      a.Tenancy,
+		TenantModels: tenantModels,
 	})
 	if err != nil {
 		return fmt.Errorf("注册 system 模块失败: %w", err)
 	}
 	a.System = sysModule
 
-	// 业务模块工具箱：复用系统模块构建的认证/RBAC/审计中间件。
+	// 业务模块工具箱：复用系统模块构建的认证/RBAC/审计/租户中间件。
 	kit := &modkit.Kit{
 		DB:           a.DB,
 		Cache:        a.Cache,
@@ -85,8 +90,10 @@ func (a *App) registerModules(api *gin.RouterGroup) error {
 		Auth:         sysModule.AuthMW,
 		RBAC:         sysModule.RBACMW,
 		OperLog:      sysModule.OperLogMW,
+		Tenant:       sysModule.TenantMW,
 		ResolveScope: sysModule.Service.ResolveDataScope,
 	}
+	kit.SetTenantModelSink(tenantModels)
 
 	// —— 在此注册业务模块（每个模块一行）——
 	article.Register(kit)

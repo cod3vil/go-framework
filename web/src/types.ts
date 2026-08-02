@@ -166,6 +166,18 @@ export interface FileItem {
   createdAt: string
 }
 
+export interface Tenant {
+  id: number
+  code: string
+  name: string
+  schema: string
+  status: number
+  contact: string
+  remark: string
+  primary: boolean
+  createdAt: string
+}
+
 export interface Article {
   id: number
   title: string

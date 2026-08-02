@@ -23,6 +23,8 @@ type OperLogEntry struct {
 	Code      int
 	LatencyMS int64
 	CreatedAt time.Time
+	// TenantSchema 请求所属租户 schema，供 recorder 写入对应租户库（多租户）。
+	TenantSchema string
 }
 
 // OperLogRecorder 落库回调，实现方决定同步/异步写入。
@@ -68,17 +70,18 @@ func OperLog(record OperLogRecorder) gin.HandlerFunc {
 		c.Next()
 
 		record(OperLogEntry{
-			Username:  c.GetString(CtxUsername),
-			UserID:    UserID(c),
-			Method:    c.Request.Method,
-			Path:      c.Request.URL.Path,
-			Query:     c.Request.URL.RawQuery,
-			Body:      reqBody,
-			IP:        c.ClientIP(),
-			Status:    c.Writer.Status(),
-			Code:      extractCode(respBuf.Bytes()),
-			LatencyMS: time.Since(start).Milliseconds(),
-			CreatedAt: start,
+			Username:     c.GetString(CtxUsername),
+			UserID:       UserID(c),
+			Method:       c.Request.Method,
+			Path:         c.Request.URL.Path,
+			Query:        c.Request.URL.RawQuery,
+			Body:         reqBody,
+			IP:           c.ClientIP(),
+			Status:       c.Writer.Status(),
+			Code:         extractCode(respBuf.Bytes()),
+			LatencyMS:    time.Since(start).Milliseconds(),
+			CreatedAt:    start,
+			TenantSchema: c.GetString(CtxTenantSchema),
 		})
 	}
 }

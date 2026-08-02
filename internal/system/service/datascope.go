@@ -12,7 +12,7 @@ import (
 // 超级管理员始终为“全部”。
 func (s *Service) ResolveDataScope(ctx context.Context, userID uint) (datascope.Scope, error) {
 	var user model.SysUser
-	err := s.DB.WithContext(ctx).Preload("Roles").First(&user, userID).Error
+	err := s.db(ctx).Preload("Roles").First(&user, userID).Error
 	if err != nil {
 		return datascope.Scope{}, err
 	}
@@ -63,7 +63,7 @@ func (s *Service) ResolveDataScope(ctx context.Context, userID uint) (datascope.
 // deptDescendants 构建 部门ID -> 全部后代部门ID 的映射（一次查询全量部门后在内存中展开）。
 func (s *Service) deptDescendants(ctx context.Context) map[uint][]uint {
 	var depts []model.SysDept
-	s.DB.WithContext(ctx).Select("id", "parent_id").Find(&depts)
+	s.db(ctx).Select("id", "parent_id").Find(&depts)
 	children := make(map[uint][]uint)
 	for _, d := range depts {
 		children[d.ParentID] = append(children[d.ParentID], d.ID)
@@ -87,7 +87,7 @@ func (s *Service) deptDescendants(ctx context.Context) map[uint][]uint {
 // roleDeptIDs 查询角色自定义数据权限授权的部门 ID 列表。
 func (s *Service) roleDeptIDs(ctx context.Context, roleID uint) []uint {
 	ids := make([]uint, 0)
-	s.DB.WithContext(ctx).Table("sys_role_dept").
+	s.db(ctx).Table("sys_role_dept").
 		Where("sys_role_id = ?", roleID).Pluck("sys_dept_id", &ids)
 	return ids
 }

@@ -101,6 +101,32 @@ db.Scopes(scope.GormScope("dept_id", "created_by")).Find(&rows)
 多角色时取并集（越宽越优先）；超级管理员恒为“全部”。示例见 `internal/modules/article`
 的 `List`/`Create`，验证见 `scripts/smoke-test-datascope.sh`。
 
+### 多租户（SaaS，PostgreSQL schema 隔离）
+
+框架内置基于 PostgreSQL schema 的多租户：每个租户一个独立 schema + 独立连接池
+（DSN 固定 `search_path`），连接池天然隔离，跨租户零串号。`public` schema 承载
+租户注册表与主租户数据。开关：`tenant.enabled`（默认关闭，即单租户，行为不变）。
+
+业务模块支持多租户**只需一条规矩**：service 从 `kit.DBOf(ctx)` 取库，不要缓存 `kit.DB`：
+
+```go
+type Service struct{ kit *modkit.Kit }
+func (s *Service) db(ctx context.Context) *gorm.DB { return s.kit.DBOf(ctx) }
+func (s *Service) List(ctx context.Context) { s.db(ctx).Find(&rows) } // 自动路由到当前租户库
+```
+
+并在 `Register` 中登记模型，供开通新租户时在其 schema 内建表：
+
+```go
+kit.RegisterModels(&Article{})
+```
+
+租户在后台「租户管理」开通（自动创建 schema + 迁移系统表与业务表 + 种子管理员/角色/菜单）。
+租户用户登录时在登录页填写租户编码（或请求头 `X-Tenant`）路由到其 schema，
+登录后租户信息随 JWT 下发，后续请求自动路由。验证见 `scripts/smoke-test-tenant.sh`。
+
+> 注意：定时任务在 cron 上下文中运行（无请求租户），当前版本对主租户/public 生效。
+
 ## 2. 挂载模块（一行）
 
 在 `internal/app/router.go` 的 `registerModules` 中，业务模块注册区加一行：

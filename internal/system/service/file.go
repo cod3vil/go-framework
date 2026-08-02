@@ -19,7 +19,7 @@ func (s *Service) UploadFile(ctx context.Context, fh *multipart.FileHeader, oper
 		Ext: res.Ext, Size: res.Size, Storage: s.Config.Upload.Driver,
 	}
 	file.CreatedBy = operator
-	if err := s.DB.WithContext(ctx).Create(&file).Error; err != nil {
+	if err := s.db(ctx).Create(&file).Error; err != nil {
 		// 落库失败时清理已写入的物理文件，避免孤儿文件。
 		_ = s.Uploader.Delete(ctx, res.Key)
 		return nil, errs.ErrInternal.WithCause(err)
@@ -37,7 +37,7 @@ type FileQuery struct {
 
 // ListFiles 分页查询文件（按时间倒序）。
 func (s *Service) ListFiles(ctx context.Context, q FileQuery) ([]model.SysFile, int64, error) {
-	db := s.DB.WithContext(ctx).Model(&model.SysFile{})
+	db := s.db(ctx).Model(&model.SysFile{})
 	if q.Name != "" {
 		db = db.Where("name LIKE ?", "%"+q.Name+"%")
 	}
@@ -74,7 +74,7 @@ func (s *Service) DeleteFile(ctx context.Context, id uint) error {
 	if err := s.Uploader.Delete(ctx, file.Key); err != nil {
 		s.Logger.Warn("删除物理文件失败: " + err.Error())
 	}
-	if err := s.DB.WithContext(ctx).Unscoped().Delete(file).Error; err != nil {
+	if err := s.db(ctx).Unscoped().Delete(file).Error; err != nil {
 		return errs.ErrInternal.WithCause(err)
 	}
 	return nil
